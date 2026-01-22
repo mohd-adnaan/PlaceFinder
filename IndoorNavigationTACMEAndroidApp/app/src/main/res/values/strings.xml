@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<resources>
+<string name="app_name">IMU Navigation</string>
+<string name="navigation_title">Indoor Navigation</string>
+<string name="source_hint">Enter source location</string>
+<string name="destination_hint">Enter destination location</string>
+<string name="start_navigation">Start Navigation</string>
+<string name="stop_navigation">Stop</string>
+<string name="reset_position">Reset Position</string>
+<string name="clock_directions">Clock Directions</string>
+<string name="use_landmarks">Use Landmarks</string>
+<string name="position_label">Position:</string>
+<string name="bearing_label">Bearing:</string>
+<string name="steps_label">Steps:</string>
+<string name="calibrated_label">Calibrated:</string>
+<string name="instructions_label">Instructions:</string>
+<string name="yes">Yes</string>
+<string name="no">No</string>
+<string name="sensor_permission_required">Sensor permissions required for navigation</string>
+<string name="enter_locations">Please enter source and destination</string>
+<string name="navigation_started">Navigation started</string>
+<string name="navigation_stopped">Navigation stopped</string>
+<string name="position_reset">Position reset</string>
+<string name="ready_to_navigate">Ready to navigate</string>
+<string name="connection_error">Connection error:</string>
+</resources>

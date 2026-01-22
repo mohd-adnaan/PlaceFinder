@@ -3,7 +3,7 @@
 .AppleDouble
 .LSOverride
 
-# iOS
+# iOS / Xcode
 *.xcuserstate
 *.xcworkspace
 !*.xcworkspace/contents.xcworkspacedata
@@ -39,3 +39,7 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Swift playground data
+timeline.xctimeline
+playground.xcworkspace

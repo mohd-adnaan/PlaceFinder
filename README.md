@@ -182,8 +182,3 @@ The app requires the following permissions (configured in Info.plist):
 ## License
 
 This project is part of the TACME Indoor Navigation research project.
-
-## Credits
-
-Converted from Android by Claude AI assistant.
-Original Android implementation: IndoorNavigationTACMEAndroidApp

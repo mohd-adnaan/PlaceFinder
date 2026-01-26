@@ -43,3 +43,12 @@ fastlane/test_output
 # Swift playground data
 timeline.xctimeline
 playground.xcworkspace
+
+# api Keys 
+IndoorNavigationTACMEiOS/**/Config.xcconfig
+IndoorNavigationTACMEiOS/IndoorNavigationTACME/Config.xcconfig
+
+# Keys
+**/Config.xcconfig
+**/*.xcconfig
+**/Secrets.swift

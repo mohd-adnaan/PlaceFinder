@@ -155,25 +155,25 @@ class IMUSensorManager: ObservableObject {
     /// Start step length calibration
     func startStepCalibration() {
         stepFactorCalibration.startCalibration()
-        imuState.isStepCalibrating = true
+        imuState.isCalibrating = true
         print("IMUSensorManager: Step calibration started")
     }
     
     /// Complete step calibration
     func completeStepCalibration() {
         stepFactorCalibration.completeCalibration()
-        imuState.userBeta = stepFactorCalibration.getUserBeta()
+        imuState.beta = stepFactorCalibration.getUserBeta()
         imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
-        imuState.isStepCalibrating = false
-        print("IMUSensorManager: Step calibration completed - beta: \(imuState.userBeta)")
+        imuState.isCalibrating = false
+        print("IMUSensorManager: Step calibration completed - beta: \(imuState.beta)")
     }
     
     /// Stop step calibration
     func stopStepCalibration() {
         let _ = stepFactorCalibration.stopCalibration()
-        imuState.userBeta = stepFactorCalibration.getUserBeta()
+        imuState.beta = stepFactorCalibration.getUserBeta()
         imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
-        imuState.isStepCalibrating = false
+        imuState.isCalibrating = false
         print("IMUSensorManager: Step calibration stopped")
     }
     
@@ -425,9 +425,11 @@ class IMUSensorManager: ObservableObject {
             isMoving: isMoving,
             currentStepLength: currentStepLength,
             filterQuality: filterQuality,
-            userBeta: stepFactorCalibration.getUserBeta(),
+            beta: stepFactorCalibration.getUserBeta(),
             isStepCalibrationValid: stepFactorCalibration.isCalibrationValid(),
-            isStepCalibrating: stepFactorCalibration.isCalibrating
+            isCalibrating: stepFactorCalibration.isCalibrating,
+            calibrationStepCount: 0,
+            bearing: currentBearing
         )
     }
 }
@@ -481,7 +483,6 @@ class UserStepFactorCalibration {
         
         if accumulatedAccelerationDiff > 0 && userStepCount > 0 {
             // Estimate based on partial data
-            let avgStepAccDiff = accumulatedAccelerationDiff / Double(userStepCount)
             let estimatedDistance = Double(userStepCount) * 0.65 // Assume average step
             userBeta = estimatedDistance / accumulatedAccelerationDiff
             isValid = userBeta > 0.1 && userBeta < 2.0

@@ -29,7 +29,17 @@ actor GeminiService {
         self.session = URLSession(configuration: configuration)
         
         // Load API key from environment or configuration
-        loadAPIKey()
+        // Try loading from Info.plist
+        if let key = Bundle.main.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String,
+           !key.isEmpty, !key.contains("$(") {
+            self.apiKey = key
+        } else if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !key.isEmpty {
+            self.apiKey = key
+        } else if let key = UserDefaults.standard.string(forKey: "GEMINI_API_KEY"), !key.isEmpty {
+            self.apiKey = key
+        } else {
+            print("Warning: Gemini API key not found")
+        }
     }
     
     // MARK: - Public Methods
@@ -169,31 +179,6 @@ actor GeminiService {
         
         let response = try await generateContent(request: request)
         return response.text
-    }
-    
-    // MARK: - Private Methods
-    
-    private func loadAPIKey() {
-        // Try loading from Info.plist
-        if let key = Bundle.main.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String, 
-           !key.isEmpty, !key.contains("$(") {
-            self.apiKey = key
-            return
-        }
-        
-        // Try loading from environment
-        if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !key.isEmpty {
-            self.apiKey = key
-            return
-        }
-        
-        // Try loading from UserDefaults (for development)
-        if let key = UserDefaults.standard.string(forKey: "GEMINI_API_KEY"), !key.isEmpty {
-            self.apiKey = key
-            return
-        }
-        
-        print("Warning: Gemini API key not found")
     }
 }
 

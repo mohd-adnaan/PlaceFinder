@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */; };
 		A10000010000000000000001 /* IndoorNavigationTACMEApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* IndoorNavigationTACMEApp.swift */; };
 		A10000010000000000000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* Models.swift */; };
 		A10000010000000000000003 /* NavigationAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* NavigationAPIService.swift */; };
@@ -31,6 +32,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5F99098E2F24365E00C76C41 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
+		5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config_EXAPMLE.xcconfig; sourceTree = "<group>"; };
 		A20000010000000000000001 /* IndoorNavigationTACMEApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorNavigationTACMEApp.swift; sourceTree = "<group>"; };
 		A20000010000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A20000010000000000000003 /* NavigationAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationAPIService.swift; sourceTree = "<group>"; };
@@ -86,6 +89,8 @@
 				A50000010000000000000008 /* Views */,
 				A20000010000000000000021 /* Assets.xcassets */,
 				A20000010000000000000022 /* Info.plist */,
+				5F99098E2F24365E00C76C41 /* Config.xcconfig */,
+				5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */,
 			);
 			path = IndoorNavigationTACME;
 			sourceTree = "<group>";
@@ -220,6 +225,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000010000000000000021 /* Assets.xcassets in Resources */,
+				5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -382,11 +388,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = VL65RWJV78;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IndoorNavigationTACME/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PlaceFinder;
+				INFOPLIST_KEY_CFBundleDisplayName = "Indoor Navigation";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -414,11 +420,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = VL65RWJV78;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IndoorNavigationTACME/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PlaceFinder;
+				INFOPLIST_KEY_CFBundleDisplayName = "Indoor Navigation";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

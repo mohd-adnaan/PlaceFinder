@@ -9,6 +9,7 @@ import Foundation
 import Speech
 import AVFoundation
 import Combine
+import UIKit
 
 /// Manages conversation-based navigation with GPT integration
 class ConversationManager: ObservableObject {
@@ -109,8 +110,8 @@ class ConversationManager: ObservableObject {
         guard !text.isEmpty else { return }
         
         // Add to conversation history
-        let userMessage = ChatMessage(message: text, isUser: true)
-        conversationState.conversationHistory.append(userMessage)
+        let userMessage = ChatMessage(content: text, isUser: true)
+        conversationState.messages.append(userMessage)
         conversationState.currentMessage = text
         conversationState.isProcessing = true
         
@@ -319,8 +320,8 @@ class ConversationManager: ObservableObject {
         
         await MainActor.run {
             // Add to history
-            let assistantMessage = ChatMessage(message: translatedResponse, isUser: false)
-            conversationState.conversationHistory.append(assistantMessage)
+            let assistantMessage = ChatMessage(content: translatedResponse, isUser: false)
+            conversationState.messages.append(assistantMessage)
             conversationState.gptResponse = translatedResponse
             conversationState.isProcessing = false
         }

@@ -179,19 +179,23 @@ private struct CalibrationStep: View {
 }
 
 // MARK: - Preview
-
 struct StepCalibrationCard_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 20) {
             // Default state
             StepCalibrationCard(
                 imuState: IMUState(
-                    beta: 0.415,
+                    position: Position(),
+                    stepCount: 0,
                     isCalibrated: false,
+                    accelerationMagnitude: 0,
+                    isMoving: false,
+                    currentStepLength: 0.65,
+                    filterQuality: "Initializing",
+                    beta: 0.415,
+                    isStepCalibrationValid: false,
                     isCalibrating: false,
                     calibrationStepCount: 0,
-                    stepCount: 0,
-                    position: Position(x: 0, y: 0),
                     bearing: 0
                 ),
                 onStartCalibration: {},
@@ -202,13 +206,18 @@ struct StepCalibrationCard_Previews: PreviewProvider {
             // Calibrating state
             StepCalibrationCard(
                 imuState: IMUState(
-                    beta: 0.415,
+                    position: Position(),
+                    stepCount: 15,
                     isCalibrated: false,
+                    accelerationMagnitude: 0.5,
+                    isMoving: true,
+                    currentStepLength: 0.72,
+                    filterQuality: "Good",
+                    beta: 0.415,
+                    isStepCalibrationValid: false,
                     isCalibrating: true,
                     calibrationStepCount: 15,
-                    stepCount: 15,
-                    position: Position(x: 0, y: 0),
-                    bearing: 0
+                    bearing: 45
                 ),
                 onStartCalibration: {},
                 onCompleteCalibration: {},
@@ -218,12 +227,17 @@ struct StepCalibrationCard_Previews: PreviewProvider {
             // Calibrated state
             StepCalibrationCard(
                 imuState: IMUState(
-                    beta: 0.423,
-                    isCalibrated: true,
-                    isCalibrating: false,
-                    calibrationStepCount: 0,
-                    stepCount: 100,
                     position: Position(x: 5, y: 10),
+                    stepCount: 100,
+                    isCalibrated: true,
+                    accelerationMagnitude: 0,
+                    isMoving: false,
+                    currentStepLength: 0.75,
+                    filterQuality: "Excellent",
+                    beta: 0.423,
+                    isStepCalibrationValid: true,
+                    isCalibrating: false,
+                    calibrationStepCount: 27,
                     bearing: 45
                 ),
                 onStartCalibration: {},

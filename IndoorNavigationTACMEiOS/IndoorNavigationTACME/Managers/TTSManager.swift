@@ -10,7 +10,7 @@ import AVFoundation
 import Combine
 
 /// Manages text-to-speech for navigation instructions
-class TTSManager: NSObject, ObservableObject {
+final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
     
     // MARK: - Published Properties
     
@@ -248,7 +248,7 @@ class TTSManager: NSObject, ObservableObject {
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .spokenContent, options: [.duckOthers, .mixWithOthers])
+            try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers, .mixWithOthers])
             try audioSession.setActive(true)
         } catch {
             print("TTSManager: Failed to setup audio session: \(error)")
@@ -449,7 +449,7 @@ class TTSManager: NSObject, ObservableObject {
 
 // MARK: - AVSpeechSynthesizerDelegate
 
-extension TTSManager: AVSpeechSynthesizerDelegate {
+extension TTSManager {
     
     func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didStart utterance: AVSpeechUtterance) {
         DispatchQueue.main.async {

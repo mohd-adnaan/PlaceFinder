@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct NavigationScreen: View {
     @EnvironmentObject var navigationManager: NavigationManager

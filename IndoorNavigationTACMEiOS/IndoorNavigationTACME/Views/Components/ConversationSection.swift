@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ConversationSection: View {
     let conversationState: ConversationState
@@ -226,14 +227,19 @@ struct ConversationSection_Previews: PreviewProvider {
                 conversationState: ConversationState(
                     isActive: true,
                     isListening: false,
+                    currentMessage: "",
                     currentSpeechText: "",
+                    gptResponse: "",
+                    hasRouteData: false,
+                    isProcessing: false,
+                    errorMessage: nil,
+                    lastError: nil,
                     messages: [
-                        ChatMessage(id: UUID(), content: "How do I get to the elevator?", isUser: true, timestamp: Date().addingTimeInterval(-120)),
-                        ChatMessage(id: UUID(), content: "From Room 101, go straight for 20 meters, then turn right. The elevator will be on your left.", isUser: false, timestamp: Date().addingTimeInterval(-60)),
-                        ChatMessage(id: UUID(), content: "Thanks! What floor is the cafeteria on?", isUser: true, timestamp: Date())
+                        ChatMessage(content: "How do I get to the elevator?", isUser: true, timestamp: Date().addingTimeInterval(-120)),
+                        ChatMessage(content: "From Room 101, go straight for 20 meters, then turn right. The elevator will be on your left.", isUser: false, timestamp: Date().addingTimeInterval(-60)),
+                        ChatMessage(content: "Thanks! What floor is the cafeteria on?", isUser: true, timestamp: Date())
                     ],
-                    extractedIntent: nil,
-                    lastError: nil
+                    extractedIntent: nil
                 ),
                 onSendMessage: { _ in }
             )
@@ -243,10 +249,15 @@ struct ConversationSection_Previews: PreviewProvider {
                 conversationState: ConversationState(
                     isActive: true,
                     isListening: true,
+                    currentMessage: "",
                     currentSpeechText: "How do I get to...",
+                    gptResponse: "",
+                    hasRouteData: false,
+                    isProcessing: false,
+                    errorMessage: nil,
+                    lastError: nil,
                     messages: [],
-                    extractedIntent: nil,
-                    lastError: nil
+                    extractedIntent: nil
                 ),
                 onSendMessage: { _ in }
             )

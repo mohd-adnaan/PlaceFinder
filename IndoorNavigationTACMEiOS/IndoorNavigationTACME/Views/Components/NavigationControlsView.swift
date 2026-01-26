@@ -50,7 +50,7 @@ struct NavigationControlsView: View {
                     icon: "link",
                     color: .blue,
                     isEnabled: canStart,
-                    isLoading: initStep == .connecting || initStep == .server_response,
+                    isLoading: initStep == .connecting || initStep == .serverResponse,
                     action: onInitialize
                 )
             }
@@ -236,69 +236,45 @@ struct SecondaryButton: View {
 }
 
 // MARK: - Preview
-
-struct NavigationControlsView_Previews: PreviewProvider {
+struct QRDetectionCard_Previews: PreviewProvider {
     static var previews: some View {
         VStack(spacing: 20) {
-            // Initial state
-            NavigationControlsView(
-                navigationState: NavigationState(
-                    isNavigating: false,
-                    isInitialized: false,
-                    isCalibrated: false,
-                    currentInstruction: "Ready",
-                    initializationStep: .notStarted
+            // Scanning state
+            QRDetectionCard(
+                qrState: QRDetectionState(
+                    isDetected: false,
+                    lastDetectionTime: nil,
+                    detectionCount: 0,
+                    isScanning: true,
+                    detectedContent: nil,
+                    scanMode: .walking
                 ),
-                conversationActive: false,
-                canStart: true,
-                onInitialize: {},
-                onStart: {},
-                onStop: {},
-                onReset: {},
-                onRepeat: {}
-            )
-            
-            // Initialized, ready to start
-            NavigationControlsView(
-                navigationState: NavigationState(
-                    isNavigating: false,
-                    isInitialized: true,
-                    isCalibrated: false,
-                    currentInstruction: "Ready",
-                    initializationStep: .completed
-                ),
-                conversationActive: false,
-                canStart: true,
-                onInitialize: {},
-                onStart: {},
-                onStop: {},
-                onReset: {},
-                onRepeat: {}
-            )
-            
-            // Navigating
-            NavigationControlsView(
                 navigationState: NavigationState(
                     isNavigating: true,
-                    isInitialized: true,
-                    isCalibrated: true,
-                    currentInstruction: "Continue straight",
-                    source: "Room 101",
-                    destination: "Elevator",
+                    initializationStep: .completed,
                     qrDetectionActive: true,
-                    currentQRId: "QR_5",
-                    qrSyncMode: "SMART_SYNC",
-                    currentSegmentId: 2,
-                    trueBearing: 45.5,
-                    initializationStep: .completed
+                    qrSyncMode: "SMART_SYNC"
+                )
+            )
+            
+            // Detected state
+            QRDetectionCard(
+                qrState: QRDetectionState(
+                    isDetected: true,
+                    lastDetectionTime: Date().addingTimeInterval(-15),
+                    detectionCount: 5,
+                    isScanning: true,
+                    detectedContent: "QR_Id:https://qrco.de/bgErvr",
+                    scanMode: .walking
                 ),
-                conversationActive: false,
-                canStart: true,
-                onInitialize: {},
-                onStart: {},
-                onStop: {},
-                onReset: {},
-                onRepeat: {}
+                navigationState: NavigationState(
+                    isNavigating: true,
+                    initializationStep: .completed,
+                    qrDetectionActive: true,
+                    currentQRId: "bgErvr",
+                    lastSentQRId: "bgErvr",
+                    qrSyncMode: "SMART_SYNC"
+                )
             )
         }
         .padding()

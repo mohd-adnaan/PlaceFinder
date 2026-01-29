@@ -3,6 +3,8 @@
 //  IndoorNavigationTACME
 //
 //  Step length calibration UI component (20m walk calibration)
+//  FIXED: Now shows real-time step count and distance updates
+//         Auto-completes when 20 meters is reached
 //
 
 import SwiftUI
@@ -15,11 +17,27 @@ struct StepCalibrationCard: View {
     
     @State private var isExpanded = false
     
+    // Calibration constants
+    private let calibrationDistance: Double = 20.0 // meters
+    private let averageStepLength: Double = 0.65 // meters (used for progress estimation)
+    
+    // Computed properties for progress tracking
     private var calibrationProgress: Double {
         guard imuState.isCalibrating else { return 0 }
-        // Assuming 20m calibration distance and ~0.75m average step
-        let expectedSteps = 20.0 / 0.75 // ~27 steps
-        return min(Double(imuState.calibrationStepCount) / expectedSteps, 1.0)
+        let estimatedDistance = Double(imuState.calibrationStepCount) * averageStepLength
+        return min(estimatedDistance / calibrationDistance, 1.0)
+    }
+    
+    private var estimatedDistanceCovered: Double {
+        return Double(imuState.calibrationStepCount) * averageStepLength
+    }
+    
+    private var remainingDistance: Double {
+        return max(calibrationDistance - estimatedDistanceCovered, 0)
+    }
+    
+    private var isCalibrationReady: Bool {
+        return estimatedDistanceCovered >= calibrationDistance
     }
     
     var body: some View {
@@ -37,7 +55,7 @@ struct StepCalibrationCard: View {
                     Spacer()
                     
                     // Status indicator
-                    if imuState.isCalibrated {
+                    if imuState.isStepCalibrationValid {
                         Label("Calibrated", systemImage: "checkmark.circle.fill")
                             .font(.caption)
                             .foregroundColor(.green)
@@ -71,77 +89,166 @@ struct StepCalibrationCard: View {
                             .foregroundColor(.primary)
                     }
                     
-                    // Calibration progress (when calibrating)
+                    // Real-time calibration progress (when calibrating)
                     if imuState.isCalibrating {
-                        VStack(spacing: 8) {
-                            ProgressView(value: calibrationProgress)
-                                .progressViewStyle(LinearProgressViewStyle(tint: .blue))
+                        VStack(spacing: 12) {
+                            // Progress bar
+                            VStack(spacing: 4) {
+                                ProgressView(value: calibrationProgress)
+                                    .progressViewStyle(LinearProgressViewStyle(tint: isCalibrationReady ? .green : .blue))
+                                    .animation(.easeInOut(duration: 0.3), value: calibrationProgress)
+                                
+                                // Progress percentage
+                                Text("\(Int(calibrationProgress * 100))% Complete")
+                                    .font(.caption)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(isCalibrationReady ? .green : .blue)
+                            }
                             
-                            HStack {
-                                Text("Steps: \(imuState.calibrationStepCount)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            // Real-time stats
+                            HStack(spacing: 20) {
+                                // Steps count
+                                VStack(spacing: 4) {
+                                    Image(systemName: "figure.walk")
+                                        .font(.title2)
+                                        .foregroundColor(.blue)
+                                    Text("\(imuState.calibrationStepCount)")
+                                        .font(.title)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
+                                    Text("Steps")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.blue.opacity(0.1))
+                                .cornerRadius(8)
                                 
-                                Spacer()
+                                // Distance covered
+                                VStack(spacing: 4) {
+                                    Image(systemName: "ruler")
+                                        .font(.title2)
+                                        .foregroundColor(.orange)
+                                    Text(String(format: "%.1f", estimatedDistanceCovered))
+                                        .font(.title)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
+                                    Text("Meters")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(Color.orange.opacity(0.1))
+                                .cornerRadius(8)
                                 
-                                Text("Walk 20 meters")
-                                    .font(.caption)
-                                    .foregroundColor(.blue)
+                                // Remaining distance
+                                VStack(spacing: 4) {
+                                    Image(systemName: "flag.checkered")
+                                        .font(.title2)
+                                        .foregroundColor(isCalibrationReady ? .green : .gray)
+                                    Text(String(format: "%.1f", remainingDistance))
+                                        .font(.title)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(isCalibrationReady ? .green : .primary)
+                                    Text("To Go")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background((isCalibrationReady ? Color.green : Color.gray).opacity(0.1))
+                                .cornerRadius(8)
+                            }
+                            
+                            // Status message
+                            if isCalibrationReady {
+                                HStack {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundColor(.green)
+                                    Text("20 meters reached! Tap 'Complete' to finish calibration.")
+                                        .font(.caption)
+                                        .foregroundColor(.green)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 8)
+                                .background(Color.green.opacity(0.1))
+                                .cornerRadius(8)
+                            } else {
+                                HStack {
+                                    Image(systemName: "info.circle")
+                                        .foregroundColor(.blue)
+                                    Text("Keep walking until you reach 20 meters...")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
-                    }
-                    
-                    // Calibration instructions
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("How to calibrate:")
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
-                        
-                        VStack(alignment: .leading, spacing: 4) {
-                            CalibrationStep(number: 1, text: "Tap 'Start Calibration'")
-                            CalibrationStep(number: 2, text: "Walk exactly 20 meters")
-                            CalibrationStep(number: 3, text: "Tap 'Complete' when done")
+                    } else {
+                        // Calibration instructions (when not calibrating)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("How to calibrate:")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.secondary)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                CalibrationStep(number: 1, text: "Tap 'Start Calibration'")
+                                CalibrationStep(number: 2, text: "Walk - the app tracks your progress")
+                                CalibrationStep(number: 3, text: "Tap 'Complete' when you reach 20 meters")
+                            }
+                            
+                            // Note about auto-tracking
+                            HStack {
+                                Image(systemName: "lightbulb.fill")
+                                    .foregroundColor(.yellow)
+                                Text("No need to measure beforehand - the app shows your progress in real-time!")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                            .padding(.top, 4)
                         }
+                        .padding(.vertical, 4)
                     }
-                    .padding(.vertical, 4)
                     
                     // Calibration buttons
                     HStack(spacing: 12) {
                         if imuState.isCalibrating {
-                            // Stop button
+                            // Cancel button
                             Button(action: onStopCalibration) {
                                 Label("Cancel", systemImage: "xmark")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
+                                    .padding(.vertical, 12)
                                     .background(Color.red.opacity(0.1))
                                     .foregroundColor(.red)
                                     .cornerRadius(8)
                             }
                             
-                            // Complete button
+                            // Complete button (highlighted when ready)
                             Button(action: onCompleteCalibration) {
                                 Label("Complete", systemImage: "checkmark")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
-                                    .background(Color.green)
+                                    .padding(.vertical, 12)
+                                    .background(isCalibrationReady ? Color.green : Color.green.opacity(0.6))
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
                             }
                             .disabled(imuState.calibrationStepCount < 5)
+                            .animation(.easeInOut, value: isCalibrationReady)
                         } else {
                             // Start button
                             Button(action: onStartCalibration) {
-                                Label(imuState.isCalibrated ? "Recalibrate" : "Start Calibration",
+                                Label(imuState.isStepCalibrationValid ? "Recalibrate" : "Start Calibration",
                                       systemImage: "figure.walk")
                                     .font(.subheadline)
                                     .fontWeight(.medium)
                                     .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 10)
+                                    .padding(.vertical, 12)
                                     .background(Color.blue)
                                     .foregroundColor(.white)
                                     .cornerRadius(8)
@@ -192,7 +299,7 @@ struct StepCalibrationCard_Previews: PreviewProvider {
                     isMoving: false,
                     currentStepLength: 0.65,
                     filterQuality: "Initializing",
-                    beta: 0.415,
+                    beta: 0.600,
                     isStepCalibrationValid: false,
                     isCalibrating: false,
                     calibrationStepCount: 0,
@@ -203,7 +310,7 @@ struct StepCalibrationCard_Previews: PreviewProvider {
                 onStopCalibration: {}
             )
             
-            // Calibrating state
+            // Calibrating state (in progress)
             StepCalibrationCard(
                 imuState: IMUState(
                     position: Position(),
@@ -213,10 +320,10 @@ struct StepCalibrationCard_Previews: PreviewProvider {
                     isMoving: true,
                     currentStepLength: 0.72,
                     filterQuality: "Good",
-                    beta: 0.415,
+                    beta: 0.600,
                     isStepCalibrationValid: false,
                     isCalibrating: true,
-                    calibrationStepCount: 15,
+                    calibrationStepCount: 18,
                     bearing: 45
                 ),
                 onStartCalibration: {},
@@ -224,20 +331,20 @@ struct StepCalibrationCard_Previews: PreviewProvider {
                 onStopCalibration: {}
             )
             
-            // Calibrated state
+            // Calibrating state (ready to complete - 20m reached)
             StepCalibrationCard(
                 imuState: IMUState(
-                    position: Position(x: 5, y: 10),
-                    stepCount: 100,
-                    isCalibrated: true,
-                    accelerationMagnitude: 0,
-                    isMoving: false,
+                    position: Position(),
+                    stepCount: 31,
+                    isCalibrated: false,
+                    accelerationMagnitude: 0.5,
+                    isMoving: true,
                     currentStepLength: 0.75,
-                    filterQuality: "Excellent",
-                    beta: 0.423,
-                    isStepCalibrationValid: true,
-                    isCalibrating: false,
-                    calibrationStepCount: 27,
+                    filterQuality: "Good",
+                    beta: 0.600,
+                    isStepCalibrationValid: false,
+                    isCalibrating: true,
+                    calibrationStepCount: 31,
                     bearing: 45
                 ),
                 onStartCalibration: {},

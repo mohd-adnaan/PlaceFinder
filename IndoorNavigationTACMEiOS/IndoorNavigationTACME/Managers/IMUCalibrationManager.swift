@@ -3,10 +3,28 @@
 //  IndoorNavigationTACME
 //
 //  Manages IMU calibration and coordinate system transformations
+//  FIXED: CalibrationState struct now defined in this file
 //
 
 import Foundation
 import Combine
+
+// MARK: - Calibration State Model
+
+/// State tracking for IMU calibration
+struct CalibrationState {
+    var isPositionCalibrated: Bool = false
+    var isBearingCalibrated: Bool = false
+    var positionOffsetX: Double = 0.0
+    var positionOffsetY: Double = 0.0
+    var bearingOffset: Double = 0.0
+    var calibrationConfidence: Double = 0.0
+    var calibrationTimestamp: Date? = nil
+    var permanentBearingOffset: Double? = nil
+    var initialBearing: Double? = nil
+}
+
+// MARK: - IMU Calibration Manager
 
 /// Manages IMU calibration and coordinate transformations
 class IMUCalibrationManager: ObservableObject {
@@ -41,58 +59,52 @@ class IMUCalibrationManager: ObservableObject {
         mapBearing: Double?,
         stepCount: Int = 0
     ) -> Bool {
-        do {
-            let currentTime = Date()
-            
-            // Calculate position offset
-            let offsetX = mapX - currentImuPosition.x
-            let offsetY = mapY - currentImuPosition.y
-            
-            // Calculate bearing offset if provided
-            var bearingOffset: Double = 0
-            var isBearingCalibrated = false
-            
-            if let bearing = mapBearing {
-                if !calibrationState.isBearingCalibrated {
-                    // First time calibration - set initial bearing
-                    sensorManager?.setInitialBearing(bearing)
-                    calibrationState.initialBearing = bearing
-                    bearingOffset = 0
-                    isBearingCalibrated = true
-                    print("IMUCalibrationManager: Initial bearing set: \(bearing)°")
-                } else {
-                    print("IMUCalibrationManager: Recalibration - preserving existing bearing")
-                }
+        let currentTime = Date()
+        
+        // Calculate position offset
+        let offsetX = mapX - currentImuPosition.x
+        let offsetY = mapY - currentImuPosition.y
+        
+        // Calculate bearing offset if provided
+        var bearingOffset: Double = 0
+        var isBearingCalibrated = false
+        
+        if let bearing = mapBearing {
+            if !calibrationState.isBearingCalibrated {
+                // First time calibration - set initial bearing
+                sensorManager?.setInitialBearing(bearing)
+                calibrationState.initialBearing = bearing
+                bearingOffset = 0
+                isBearingCalibrated = true
+                print("IMUCalibrationManager: Initial bearing set: \(bearing)°")
+            } else {
+                print("IMUCalibrationManager: Recalibration - preserving existing bearing")
             }
-            
-            // Calculate confidence
-            let confidence = calculateConfidence(stepCount: stepCount, timeElapsed: 0)
-            
-            calibrationState = CalibrationState(
-                isPositionCalibrated: true,
-                isBearingCalibrated: isBearingCalibrated || calibrationState.isBearingCalibrated,
-                positionOffsetX: offsetX,
-                positionOffsetY: offsetY,
-                bearingOffset: bearingOffset,
-                calibrationConfidence: confidence,
-                calibrationTimestamp: currentTime,
-                permanentBearingOffset: calibrationState.permanentBearingOffset,
-                initialBearing: calibrationState.initialBearing ?? mapBearing
-            )
-            
-            lastKnownImuPosition = currentImuPosition
-            
-            print("IMUCalibrationManager: Calibration complete")
-            print("  Position offset: (\(offsetX), \(offsetY))")
-            print("  Bearing offset: \(bearingOffset)°")
-            print("  Confidence: \(confidence)")
-            
-            return true
-            
-        } catch {
-            print("IMUCalibrationManager: Calibration failed: \(error)")
-            return false
         }
+        
+        // Calculate confidence
+        let confidence = calculateConfidence(stepCount: stepCount, timeElapsed: 0)
+        
+        calibrationState = CalibrationState(
+            isPositionCalibrated: true,
+            isBearingCalibrated: isBearingCalibrated || calibrationState.isBearingCalibrated,
+            positionOffsetX: offsetX,
+            positionOffsetY: offsetY,
+            bearingOffset: bearingOffset,
+            calibrationConfidence: confidence,
+            calibrationTimestamp: currentTime,
+            permanentBearingOffset: calibrationState.permanentBearingOffset,
+            initialBearing: calibrationState.initialBearing ?? mapBearing
+        )
+        
+        lastKnownImuPosition = currentImuPosition
+        
+        print("IMUCalibrationManager: Calibration complete")
+        print("  Position offset: (\(offsetX), \(offsetY))")
+        print("  Bearing offset: \(bearingOffset)°")
+        print("  Confidence: \(confidence)")
+        
+        return true
     }
     
     /// Transform IMU position to map coordinates

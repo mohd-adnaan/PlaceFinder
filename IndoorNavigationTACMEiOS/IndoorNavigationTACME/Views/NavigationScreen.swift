@@ -24,6 +24,8 @@ struct NavigationScreen: View {
     @State private var useLandmarks: Bool = false
     @State private var showAdvancedInfo: Bool = false
     @State private var showDoubleTapFeedback: Bool = false
+    @State private var showCalibrationSheet: Bool = false
+    @State private var showQRScanner: Bool = false
     
     var body: some View {
         DoubleTapContainer(
@@ -39,17 +41,22 @@ struct NavigationScreen: View {
                         doubleTapHintView
                     }
                     
-                    // Status indicator
+                    // Status indicator - NOW INTERACTIVE
                     StatusIndicatorView(
                         isNavigating: navigationManager.navigationState.isNavigating,
                         isCalibrated: navigationManager.navigationState.isCalibrated,
                         ttsReady: ttsManager.ttsState.isReady,
                         qrDetectionActive: navigationManager.navigationState.qrDetectionActive,
                         qrDetected: qrDetector.detectionState.isDetected,
-                        conversationActive: conversationManager.conversationState.isActive
+                        conversationActive: conversationManager.conversationState.isActive,
+                        onNavTap: handleNavTap,
+                        onCalTap: handleCalTap,
+                        onTtsTap: handleTtsTap,
+                        onQrTap: handleQrTap,
+                        onAiTap: handleAiTap
                     )
                     
-                    // Navigation input section
+                    // Navigation input section with proper dropdowns
                     NavigationInputSection(
                         source: $source,
                         destination: $destination,
@@ -60,13 +67,23 @@ struct NavigationScreen: View {
                         onTtsEnabledChange: { ttsManager.setEnabled($0) }
                     )
                     
-                    // Step calibration card
+                    // Step calibration card - with real-time updates
                     StepCalibrationCard(
                         imuState: sensorManager.imuState,
                         onStartCalibration: { sensorManager.startStepCalibration() },
                         onCompleteCalibration: { sensorManager.completeStepCalibration() },
                         onStopCalibration: { sensorManager.stopStepCalibration() }
                     )
+                    
+                    // AI Conversation section
+                    if conversationManager.conversationState.isActive {
+                        ConversationSection(
+                            conversationState: conversationManager.conversationState,
+                            onSendMessage: { message in
+                                conversationManager.processTextInput(message)
+                            }
+                        )
+                    }
                     
                     // Current instruction display
                     InstructionCard(
@@ -75,33 +92,25 @@ struct NavigationScreen: View {
                         errorMessage: navigationManager.navigationState.errorMessage
                     )
                     
-                    // Navigation controls
-                    NavigationControlsView(
-                        navigationState: navigationManager.navigationState,
-                        conversationActive: conversationManager.conversationState.isActive,
-                        canStart: !source.isEmpty && !destination.isEmpty,
-                        onInitialize: initializeNavigation,
-                        onStart: startNavigation,
-                        onStop: { navigationManager.stopNavigation() },
-                        onReset: resetAll,
-                        onRepeat: { ttsManager.repeatLastInstruction() }
-                    )
-                    
-                    // QR Detection card (when active)
-                    if navigationManager.navigationState.qrDetectionActive {
+                    // QR detection status (when active)
+                    if navigationManager.navigationState.qrDetectionActive || qrDetector.detectionState.isScanning {
                         QRDetectionCard(
                             qrState: qrDetector.detectionState,
                             navigationState: navigationManager.navigationState
                         )
                     }
                     
-                    // Conversation section (when active)
-                    if conversationManager.conversationState.isActive {
-                        ConversationSection(
-                            conversationState: conversationManager.conversationState,
-                            onSendMessage: { conversationManager.processTextInput($0) }
-                        )
-                    }
+                    // Navigation controls
+                    NavigationControlsView(
+                        navigationState: navigationManager.navigationState,
+                        conversationActive: conversationManager.conversationState.isActive,
+                        canStart: !source.isEmpty && !destination.isEmpty,
+                        onInitialize: initializeServer,
+                        onStart: startNavigation,
+                        onStop: stopNavigation,
+                        onReset: resetAll,
+                        onRepeat: { ttsManager.repeatLastInstruction() }
+                    )
                     
                     Spacer(minLength: 50)
                 }
@@ -109,36 +118,32 @@ struct NavigationScreen: View {
             }
         }
         .onAppear {
-            sensorManager.startSensors()
+            // Initialize sensors when view appears
+            sensorManager.startUpdates()
         }
         .onDisappear {
-            sensorManager.stopSensors()
+            // Stop sensors when view disappears
+            sensorManager.stopUpdates()
         }
+        .overlay(doubleTapFeedbackOverlay)
     }
     
-    // MARK: - Subviews
+    // MARK: - Header View
     
     private var headerView: some View {
         HStack {
-            Text(languageManager.getString("Navigation Setup"))
-                .font(.title2)
+            Text("Navigation Setup")
+                .font(.largeTitle)
                 .fontWeight(.bold)
             
             Spacer()
             
             // Language toggle button
-            Button(action: {
-                languageManager.toggleLanguage()
-                ttsManager.speak(
-                    languageManager.currentLanguage == .french ?
-                        "Langue changée en français" : "Language changed to English",
-                    force: true
-                )
-            }) {
+            Button(action: toggleLanguage) {
                 HStack(spacing: 4) {
                     Image(systemName: "globe")
                     Text(languageManager.currentLanguage == .english ? "EN" : "FR")
-                        .fontWeight(.semibold)
+                        .fontWeight(.bold)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
@@ -146,9 +151,10 @@ struct NavigationScreen: View {
                 .cornerRadius(8)
             }
             
-            // Reset button
-            Button(action: resetAll) {
+            // Refresh button
+            Button(action: refreshState) {
                 Image(systemName: "arrow.clockwise")
+                    .font(.title2)
                     .foregroundColor(.red)
                     .padding(8)
                     .background(Color.red.opacity(0.1))
@@ -157,37 +163,110 @@ struct NavigationScreen: View {
         }
     }
     
+    // MARK: - Double-tap hint view
+    
     private var doubleTapHintView: some View {
-        Text(languageManager.currentLanguage == .french ?
-             "Double-cliquez pour activer la saisie vocale" :
-             "Double-tap anywhere to activate voice input")
-            .font(.caption)
-            .foregroundColor(.blue)
-            .padding(.vertical, 4)
+        HStack {
+            Image(systemName: "hand.tap.fill")
+                .foregroundColor(.blue)
+            Text(languageManager.currentLanguage == .french ?
+                 "Double-tapez pour activer la saisie vocale" :
+                 "Double-tap anywhere to activate voice input")
+                .font(.caption)
+                .foregroundColor(.blue)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .background(Color.blue.opacity(0.1))
+        .cornerRadius(8)
     }
     
-    // MARK: - Actions
+    // MARK: - Double-tap feedback overlay
     
-    private func activateVoiceInput() {
-        if conversationManager.conversationState.isActive {
-            if conversationManager.conversationState.isListening {
-                conversationManager.stopListening()
-            } else {
-                conversationManager.startListening()
+    private var doubleTapFeedbackOverlay: some View {
+        Group {
+            if showDoubleTapFeedback {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Image(systemName: "mic.fill")
+                        Text("Voice input activated")
+                    }
+                    .foregroundColor(.white)
+                    .padding()
+                    .background(Color.blue)
+                    .cornerRadius(12)
+                    .shadow(radius: 10)
+                    Spacer()
+                }
+                .transition(.scale.combined(with: .opacity))
             }
-            showDoubleTapFeedback = true
-            
-            // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .medium)
-            generator.impactOccurred()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                showDoubleTapFeedback = false
-            }
+        }
+        .animation(.easeInOut(duration: 0.3), value: showDoubleTapFeedback)
+    }
+    
+    // MARK: - Status Button Actions
+    
+    private func handleNavTap() {
+        if navigationManager.navigationState.isNavigating {
+            stopNavigation()
+        } else if navigationManager.navigationState.isInitialized {
+            startNavigation()
+        } else {
+            // Provide feedback that we need to initialize first
+            ttsManager.speak("Please initialize the server first by entering source and destination.")
         }
     }
     
-    private func initializeNavigation() {
+    private func handleCalTap() {
+        // Toggle calibration sheet or start step calibration
+        if sensorManager.imuState.isCalibrating {
+            sensorManager.completeStepCalibration()
+            ttsManager.speak("Calibration completed. Beta factor: \(String(format: "%.3f", sensorManager.imuState.beta))")
+        } else {
+            sensorManager.startStepCalibration()
+            ttsManager.speak("Calibration started. Walk 20 meters and tap again to complete.")
+        }
+    }
+    
+    private func handleTtsTap() {
+        // Toggle TTS
+        let newState = !ttsManager.ttsState.isEnabled
+        ttsManager.setEnabled(newState)
+        
+        if newState {
+            ttsManager.speak("Voice guidance enabled")
+        }
+    }
+    
+    private func handleQrTap() {
+        // Toggle QR scanning
+        if qrDetector.detectionState.isScanning {
+            qrDetector.stopScanning()
+            ttsManager.speak("QR scanning stopped")
+        } else {
+            qrDetector.startScanning()
+            ttsManager.speak("QR scanning started. Point your camera at a QR code.")
+        }
+    }
+    
+    private func handleAiTap() {
+        // Toggle AI conversation
+        if conversationManager.conversationState.isActive {
+            conversationManager.stopConversationMode()
+        } else {
+            conversationManager.startConversationMode()
+        }
+    }
+    
+    // MARK: - Navigation Actions
+    
+    private func initializeServer() {
+        guard !source.isEmpty && !destination.isEmpty else {
+            ttsManager.speak("Please enter both source and destination")
+            return
+        }
+        
         Task {
             let result = await navigationManager.initializeWithServer(
                 source: source,
@@ -197,9 +276,15 @@ struct NavigationScreen: View {
                 conversationMode: conversationManager.conversationState.isActive
             )
             
-            if case .failure(let error) = result {
-                // Show error toast
-                print("Navigation initialization failed: \(error)")
+            switch result {
+            case .success:
+                // TTS announcement is handled in NavigationManager
+                print("NavigationScreen: Server initialized successfully")
+            case .failure(let error):
+                print("NavigationScreen: Server initialization failed: \(error)")
+                await MainActor.run {
+                    ttsManager.speakCritical("Server connection failed: \(error.localizedDescription)")
+                }
             }
         }
     }
@@ -208,24 +293,88 @@ struct NavigationScreen: View {
         Task {
             let result = await navigationManager.startNavigationWithCalibration()
             
-            if case .failure(let error) = result {
-                print("Navigation start failed: \(error)")
+            switch result {
+            case .success:
+                // Start QR detection for drift correction
+                qrDetector.startScanning()
+                print("NavigationScreen: Navigation started")
+            case .failure(let error):
+                print("NavigationScreen: Navigation start failed: \(error)")
+                await MainActor.run {
+                    ttsManager.speakCritical("Failed to start navigation: \(error.localizedDescription)")
+                }
             }
         }
     }
     
+    private func stopNavigation() {
+        navigationManager.stopNavigation()
+        qrDetector.stopScanning()
+        ttsManager.speak("Navigation stopped")
+    }
+    
     private func resetAll() {
+        // Stop everything
         navigationManager.stopNavigation()
         conversationManager.stopConversationMode()
+        qrDetector.stopScanning()
+        
+        // Reset sensors
         sensorManager.resetPosition()
         calibrationManager.resetCalibration()
-        qrDetector.resetDetection()
         
+        // Reset UI state
         source = ""
         destination = ""
         useClockDirections = false
         useLandmarks = false
-        showAdvancedInfo = false
+        
+        ttsManager.speak("All settings reset")
+    }
+    
+    private func toggleLanguage() {
+        languageManager.toggleLanguage()
+        let newLang = languageManager.currentLanguage == .english ? "English" : "Français"
+        ttsManager.speak("Language changed to \(newLang)")
+    }
+    
+    private func refreshState() {
+        // Force refresh all manager states
+        sensorManager.clearAccumulatedData()
+        qrDetector.resetDetection()
+        
+        // Provide feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        ttsManager.speak("State refreshed")
+    }
+    
+    private func activateVoiceInput() {
+        guard conversationManager.conversationState.isActive else {
+            // Start conversation mode if not active
+            conversationManager.startConversationMode()
+            return
+        }
+        
+        // Show feedback
+        withAnimation {
+            showDoubleTapFeedback = true
+        }
+        
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+        
+        // Start listening
+        conversationManager.startListening()
+        
+        // Hide feedback after delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            withAnimation {
+                showDoubleTapFeedback = false
+            }
+        }
     }
 }
 
@@ -235,9 +384,8 @@ struct DoubleTapContainer<Content: View>: View {
     let onDoubleTap: () -> Void
     let content: () -> Content
     
-    @State private var tapCount = 0
-    @State private var lastTapTime: Date?
-    private let multiTapTimeout: TimeInterval = 0.5
+    @State private var lastTapTime: Date = Date.distantPast
+    private let doubleTapInterval: TimeInterval = 0.5
     
     var body: some View {
         content()

@@ -2,7 +2,7 @@
 //  NavigationInputSection.swift
 //  IndoorNavigationTACME
 //
-//  Navigation input fields with POI autocomplete
+//  Navigation input fields with PROPER dropdown menus
 //
 
 import SwiftUI
@@ -17,96 +17,73 @@ struct NavigationInputSection: View {
     let poiNames: [String]
     let onTtsEnabledChange: (Bool) -> Void
     
-    @State private var showSourceSuggestions = false
-    @State private var showDestinationSuggestions = false
-    @FocusState private var sourceFieldFocused: Bool
-    @FocusState private var destinationFieldFocused: Bool
-    
     var body: some View {
         VStack(spacing: 16) {
-            // Source input
+            // Source input with dropdown
             VStack(alignment: .leading, spacing: 8) {
                 Label("Source", systemImage: "mappin.circle.fill")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.blue)
                 
-                POITextField(
-                    text: $source,
+                POIDropdownMenu(
+                    selectedValue: $source,
                     placeholder: "Enter source location",
-                    suggestions: filteredSuggestions(for: source),
-                    showSuggestions: $showSourceSuggestions,
-                    isFocused: _sourceFieldFocused,
-                    onSelect: { selected in
-                        source = selected
-                        showSourceSuggestions = false
-                    }
+                    options: poiNames
                 )
             }
             
-            // Destination input
+            // Destination input with dropdown
             VStack(alignment: .leading, spacing: 8) {
                 Label("Destination", systemImage: "flag.fill")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.green)
                 
-                POITextField(
-                    text: $destination,
+                POIDropdownMenu(
+                    selectedValue: $destination,
                     placeholder: "Enter destination location",
-                    suggestions: filteredSuggestions(for: destination),
-                    showSuggestions: $showDestinationSuggestions,
-                    isFocused: _destinationFieldFocused,
-                    onSelect: { selected in
-                        destination = selected
-                        showDestinationSuggestions = false
-                    }
+                    options: poiNames
                 )
             }
             
             // Options toggles
             VStack(spacing: 12) {
                 // Clock directions toggle
-                HStack {
-                    Toggle(isOn: $useClockDirections) {
-                        HStack {
-                            Image(systemName: "clock.fill")
-                                .foregroundColor(.orange)
-                            Text("Use Clock Directions")
-                                .font(.subheadline)
-                        }
+                Toggle(isOn: $useClockDirections) {
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.orange)
+                        Text("Use Clock Directions")
+                            .font(.subheadline)
                     }
-                    .toggleStyle(SwitchToggleStyle(tint: .orange))
                 }
+                .toggleStyle(SwitchToggleStyle(tint: .orange))
                 
                 // Landmarks toggle
-                HStack {
-                    Toggle(isOn: $useLandmarks) {
-                        HStack {
-                            Image(systemName: "building.2.fill")
-                                .foregroundColor(.purple)
-                            Text("Use Landmarks")
-                                .font(.subheadline)
-                        }
+                Toggle(isOn: $useLandmarks) {
+                    HStack {
+                        Image(systemName: "building.2.fill")
+                            .foregroundColor(.purple)
+                        Text("Use Landmarks")
+                            .font(.subheadline)
                     }
-                    .toggleStyle(SwitchToggleStyle(tint: .purple))
                 }
+                .toggleStyle(SwitchToggleStyle(tint: .purple))
                 
-                // TTS toggle
-                HStack {
-                    Toggle(isOn: Binding(
-                        get: { ttsEnabled },
-                        set: { onTtsEnabledChange($0) }
-                    )) {
-                        HStack {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .foregroundColor(.blue)
-                            Text("Voice Guidance")
-                                .font(.subheadline)
-                        }
+                // Voice guidance toggle
+                Toggle(isOn: Binding(
+                    get: { ttsEnabled },
+                    set: { onTtsEnabledChange($0) }
+                )) {
+                    HStack {
+                        Image(systemName: "speaker.wave.2.fill")
+                            .foregroundColor(.blue)
+                        Text("Voice Guidance")
+                            .font(.subheadline)
                     }
-                    .toggleStyle(SwitchToggleStyle(tint: .blue))
                 }
+                .toggleStyle(SwitchToggleStyle(tint: .blue))
             }
             .padding(.top, 8)
         }
@@ -114,18 +91,127 @@ struct NavigationInputSection: View {
         .background(Color(.secondarySystemBackground))
         .cornerRadius(12)
     }
+}
+
+// MARK: - POI Dropdown Menu (Android-style dropdown)
+
+struct POIDropdownMenu: View {
+    @Binding var selectedValue: String
+    let placeholder: String
+    let options: [String]
     
-    private func filteredSuggestions(for input: String) -> [String] {
-        guard !input.isEmpty else { return poiNames }
-        
-        let lowercasedInput = input.lowercased()
-        return poiNames.filter { poi in
-            poi.lowercased().contains(lowercasedInput)
-        }.prefix(5).map { $0 }
+    @State private var isExpanded = false
+    @State private var searchText = ""
+    @FocusState private var isSearchFocused: Bool
+    
+    private var filteredOptions: [String] {
+        if searchText.isEmpty {
+            return options
+        }
+        return options.filter { $0.localizedCaseInsensitiveContains(searchText) }
+    }
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Main button/text field
+            HStack {
+                // Text field for typing/searching
+                TextField(placeholder, text: $searchText)
+                    .textFieldStyle(PlainTextFieldStyle())
+                    .focused($isSearchFocused)
+                    .onChange(of: searchText) { newValue in
+                        if !newValue.isEmpty {
+                            isExpanded = true
+                        }
+                        // If exact match found, select it
+                        if options.contains(where: { $0.lowercased() == newValue.lowercased() }) {
+                            selectedValue = options.first(where: { $0.lowercased() == newValue.lowercased() }) ?? newValue
+                        }
+                    }
+                    .onTapGesture {
+                        isExpanded = true
+                    }
+                
+                // Dropdown arrow button
+                Button(action: {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        isExpanded.toggle()
+                    }
+                }) {
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.gray)
+                        .frame(width: 24, height: 24)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color(.systemBackground))
+            .cornerRadius(8)
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(isExpanded ? Color.blue : Color.gray.opacity(0.3), lineWidth: 1)
+            )
+            
+            // Dropdown list
+            if isExpanded && !filteredOptions.isEmpty {
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 0) {
+                        ForEach(filteredOptions, id: \.self) { option in
+                            Button(action: {
+                                selectedValue = option
+                                searchText = option
+                                isExpanded = false
+                                isSearchFocused = false
+                            }) {
+                                HStack {
+                                    Image(systemName: "mappin")
+                                        .foregroundColor(.blue)
+                                        .frame(width: 20)
+                                    
+                                    Text(option)
+                                        .foregroundColor(.primary)
+                                    
+                                    Spacer()
+                                    
+                                    if option == selectedValue {
+                                        Image(systemName: "checkmark")
+                                            .foregroundColor(.blue)
+                                    }
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .background(option == selectedValue ? Color.blue.opacity(0.1) : Color.clear)
+                            
+                            if option != filteredOptions.last {
+                                Divider()
+                                    .padding(.leading, 44)
+                            }
+                        }
+                    }
+                }
+                .frame(maxHeight: 250)
+                .background(Color(.systemBackground))
+                .cornerRadius(8)
+                .shadow(color: .black.opacity(0.15), radius: 8, x: 0, y: 4)
+                .padding(.top, 4)
+            }
+        }
+        .onAppear {
+            // Initialize search text with selected value
+            if !selectedValue.isEmpty {
+                searchText = selectedValue
+            }
+        }
+        .onChange(of: selectedValue) { newValue in
+            searchText = newValue
+        }
     }
 }
 
-// MARK: - POI TextField with Autocomplete
+// MARK: - Legacy POI TextField (for backward compatibility)
 
 struct POITextField: View {
     @Binding var text: String
@@ -196,7 +282,7 @@ struct NavigationInputSection_Previews: PreviewProvider {
             useClockDirections: .constant(false),
             useLandmarks: .constant(true),
             ttsEnabled: true,
-            poiNames: ["Room 101", "Room 102", "Elevator", "Exit", "Bathroom", "Office A"],
+            poiNames: ["Room 101", "Room 102", "Room 201", "Elevator A", "Elevator B", "Exit North", "Exit South", "Bathroom", "Office A", "Office B", "Conference Room 1", "Conference Room 2", "Cafeteria", "Lobby"],
             onTtsEnabledChange: { _ in }
         )
         .padding()

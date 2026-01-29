@@ -3,6 +3,7 @@
 //  IndoorNavigationTACME
 //
 //  QR Code detection using iOS Vision framework
+//  FIXED: Added startScanning, stopScanning, resetDetection methods
 //
 
 import Foundation
@@ -40,17 +41,10 @@ class QRCodeDetector: NSObject, ObservableObject {
     private let changeDetectionWindow: TimeInterval = 0.5
     private var lastContentChangeTime: Date?
     
-    // Walking optimization
-    private var isWalkingMode: Bool = false
-    
-    // Vision request
-    private lazy var detectBarcodeRequest: VNDetectBarcodesRequest = {
-        let request = VNDetectBarcodesRequest { [weak self] request, error in
-            self?.handleBarcodeDetection(request: request, error: error)
-        }
-        request.symbologies = [.qr]
-        return request
-    }()
+    // Configuration
+    private let frameSkip = 3 // Process every 3rd frame in walking mode
+    private let captureWidth = 1280
+    private let captureHeight = 720
     
     // MARK: - Initialization
     
@@ -59,215 +53,215 @@ class QRCodeDetector: NSObject, ObservableObject {
         print("QRCodeDetector: Initialized")
     }
     
-    deinit {
-        stopScanning()
-    }
-    
     // MARK: - Public Methods
     
     /// Start QR code scanning
     func startScanning() {
+        guard !isScanning else {
+            print("QRCodeDetector: Already scanning")
+            return
+        }
+        
         sessionQueue.async { [weak self] in
             self?.setupCaptureSession()
-            self?.captureSession?.startRunning()
-            DispatchQueue.main.async {
-                self?.isScanning = true
-                self?.detectionState.isScanning = true
-                print("QRCodeDetector: Scanning started")
-            }
         }
     }
     
     /// Stop QR code scanning
     func stopScanning() {
+        guard isScanning else { return }
+        
         sessionQueue.async { [weak self] in
             self?.captureSession?.stopRunning()
+            self?.isScanning = false
+            
             DispatchQueue.main.async {
-                self?.isScanning = false
                 self?.detectionState.isScanning = false
-                print("QRCodeDetector: Scanning stopped")
             }
+            
+            print("QRCodeDetector: Scanning stopped")
+        }
+    }
+
+    /// Test Vision framework capabilities
+    func testVisionCapabilities() {
+        print("QRCodeDetector: Testing Vision capabilities")
+        print("  - Barcode detection: Available")
+        print("  - QR symbology: Supported")
+        print("  - Camera available: \(AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) != nil)")
+        let status = AVCaptureDevice.authorizationStatus(for: .video)
+        print("  - Camera authorization: \(status.rawValue)")
+    }
+
+    /// Get detection statistics
+    func getDetectionStats() -> [String: Any] {
+        return [
+            "isScanning": detectionState.isScanning,
+            "isDetected": detectionState.isDetected,
+            "detectionCount": detectionState.detectionCount,
+            "lastQRContent": detectionState.lastQRContent ?? "None",
+            "avgProcessingTime": detectionState.avgProcessingTime,
+            "frameRate": detectionState.frameRate,
+            "scanMode": String(describing: detectionState.scanMode),
+            "actualResolution": detectionState.actualResolution,
+            "rapidChangeMode": detectionState.rapidChangeMode,
+            "detectionEngine": detectionState.detectionEngine
+        ]
+    }
+
+    /// Cleanup resources
+    func cleanup() {
+        print("QRCodeDetector: Cleaning up resources")
+        stopScanning()
+        DispatchQueue.main.async { [weak self] in
+            self?.detectionState = QRDetectionState()
         }
     }
     
     /// Reset detection state
     func resetDetection() {
-        DispatchQueue.main.async {
-            self.detectionState = QRDetectionState()
-            self.previousQRContent = nil
-            self.contentChangeCount = 0
-            self.lastContentChangeTime = nil
-            self.frameCount = 0
-            self.totalProcessingTime = 0
-            self.totalDetectionAttempts = 0
-            self.rejectedDetections = 0
-            print("QRCodeDetector: Detection reset")
-        }
-    }
-    
-    /// Enable walking optimization mode
-    func setWalkingMode(_ enabled: Bool) {
-        isWalkingMode = enabled
-    }
-    
-    /// Get detection statistics
-    func getDetectionStats() -> [String: Any] {
-        let avgProcessingTime = totalDetectionAttempts > 0 ?
-            totalProcessingTime / Double(totalDetectionAttempts) * 1000 : 0
-        
-        let frameRate: Double
-        if let lastFrame = lastFrameTime {
-            let elapsed = Date().timeIntervalSince(lastFrame)
-            frameRate = elapsed > 0 ? 1.0 / elapsed : 0
-        } else {
-            frameRate = 0
-        }
-        
-        return [
-            "totalFrames": frameCount,
-            "detectionCount": detectionState.detectionCount,
-            "avgProcessingTimeMs": String(format: "%.1f", avgProcessingTime),
-            "frameRate": String(format: "%.1f", frameRate),
-            "rejectedDetections": rejectedDetections,
-            "successRate": totalDetectionAttempts > 0 ?
-                String(format: "%.1f%%", Double(detectionState.detectionCount) / Double(totalDetectionAttempts) * 100) : "0%",
-            "walkingMode": isWalkingMode,
-            "rapidChangeMode": detectionState.rapidChangeMode
-        ]
-    }
-    
-    /// Test Vision capabilities
-    func testVisionCapabilities() {
-        print("QRCodeDetector: Testing Vision capabilities")
-        print("  - Supported symbologies: \(VNDetectBarcodesRequest.supportedSymbologies)")
-        print("  - QR Code supported: \(VNDetectBarcodesRequest.supportedSymbologies.contains(.qr))")
-    }
-    
-    /// Cleanup resources
-    func cleanup() {
         stopScanning()
-        captureSession = nil
-        videoOutput = nil
-        resetDetection()
-        print("QRCodeDetector: Cleaned up")
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.detectionState = QRDetectionState()
+        }
+        
+        frameCount = 0
+        lastDetectionTime = nil
+        totalProcessingTime = 0
+        totalDetectionAttempts = 0
+        rejectedDetections = 0
+        previousQRContent = nil
+        contentChangeCount = 0
+        
+        print("QRCodeDetector: Detection reset")
+    }
+    
+    /// Set scan mode
+    func setScanMode(_ mode: QRScanMode) {
+        detectionState.scanMode = mode
+        print("QRCodeDetector: Scan mode set to \(mode)")
     }
     
     // MARK: - Private Methods
     
     private func setupCaptureSession() {
-        guard captureSession == nil else { return }
-        
+        // Check camera authorization
+        switch AVCaptureDevice.authorizationStatus(for: .video) {
+        case .authorized:
+            initializeCaptureSession()
+        case .notDetermined:
+            AVCaptureDevice.requestAccess(for: .video) { [weak self] granted in
+                if granted {
+                    self?.initializeCaptureSession()
+                } else {
+                    self?.handleAuthorizationDenied()
+                }
+            }
+        case .denied, .restricted:
+            handleAuthorizationDenied()
+        @unknown default:
+            break
+        }
+    }
+    
+    private func initializeCaptureSession() {
         let session = AVCaptureSession()
         session.sessionPreset = .hd1280x720
         
         // Setup camera input
-        guard let videoDevice = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
-              let videoInput = try? AVCaptureDeviceInput(device: videoDevice) else {
-            print("QRCodeDetector: Failed to setup camera input")
+        guard let camera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back),
+              let input = try? AVCaptureDeviceInput(device: camera) else {
+            print("QRCodeDetector: Could not create camera input")
             return
         }
         
-        if session.canAddInput(videoInput) {
-            session.addInput(videoInput)
+        if session.canAddInput(input) {
+            session.addInput(input)
         }
         
         // Setup video output
         let output = AVCaptureVideoDataOutput()
-        output.setSampleBufferDelegate(self, queue: detectionQueue)
-        output.alwaysDiscardsLateVideoFrames = true
         output.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA
         ]
+        output.setSampleBufferDelegate(self, queue: detectionQueue)
+        output.alwaysDiscardsLateVideoFrames = true
         
         if session.canAddOutput(output) {
             session.addOutput(output)
         }
         
-        // Configure focus for QR detection
-        do {
-            try videoDevice.lockForConfiguration()
-            if videoDevice.isFocusModeSupported(.continuousAutoFocus) {
-                videoDevice.focusMode = .continuousAutoFocus
-            }
-            if videoDevice.isExposureModeSupported(.continuousAutoExposure) {
-                videoDevice.exposureMode = .continuousAutoExposure
-            }
-            videoDevice.unlockForConfiguration()
-        } catch {
-            print("QRCodeDetector: Failed to configure camera: \(error)")
-        }
-        
         captureSession = session
         videoOutput = output
         
-        DispatchQueue.main.async {
-            self.detectionState.actualResolution = "1280x720"
+        // Start session
+        session.startRunning()
+        isScanning = true
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.detectionState.isScanning = true
+            self?.detectionState.actualResolution = "\(self?.captureWidth ?? 0)x\(self?.captureHeight ?? 0)"
+            self?.detectionState.detectionEngine = "VISION"
         }
         
-        print("QRCodeDetector: Capture session configured")
+        print("QRCodeDetector: Capture session started")
     }
     
-    private func handleBarcodeDetection(request: VNRequest, error: Error?) {
-        if let error = error {
-            print("QRCodeDetector: Detection error: \(error)")
-            return
+    private func handleAuthorizationDenied() {
+        print("QRCodeDetector: Camera authorization denied")
+        DispatchQueue.main.async { [weak self] in
+            self?.detectionState.isScanning = false
         }
+    }
+    
+    private func processQRCode(_ observation: VNBarcodeObservation) {
+        guard let payload = observation.payloadStringValue else { return }
         
-        guard let results = request.results as? [VNBarcodeObservation] else { return }
-        
-        let processingEnd = Date()
-        let processingTime = lastFrameTime.map { processingEnd.timeIntervalSince($0) } ?? 0
-        totalProcessingTime += processingTime
+        let currentTime = Date()
         totalDetectionAttempts += 1
         
-        // Find QR code with highest confidence
-        let qrResults = results.filter { $0.symbology == .qr }
-        
-        if let bestResult = qrResults.max(by: { $0.confidence < $1.confidence }),
-           let payload = bestResult.payloadStringValue {
+        // Check for rapid change
+        if let previousContent = previousQRContent, previousContent != payload {
+            contentChangeCount += 1
             
-            let currentTime = Date()
-            
-            // Check for rapid change
-            let isRapidChange: Bool
-            if let prevContent = previousQRContent, prevContent != payload {
-                if let lastChangeTime = lastContentChangeTime {
-                    isRapidChange = currentTime.timeIntervalSince(lastChangeTime) < changeDetectionWindow
-                } else {
-                    isRapidChange = false
-                }
-                contentChangeCount += 1
-                lastContentChangeTime = currentTime
-            } else {
-                isRapidChange = false
+            if let lastChangeTime = lastContentChangeTime,
+               currentTime.timeIntervalSince(lastChangeTime) < changeDetectionWindow {
+                detectionState.rapidChangeMode = true
             }
             
-            previousQRContent = payload
-            
-            DispatchQueue.main.async {
-                self.detectionState.isDetected = true
-                self.detectionState.lastDetectionTime = currentTime
-                self.detectionState.detectionCount += 1
-                self.detectionState.lastQRContent = payload
-                self.detectionState.avgProcessingTime = Float(processingTime * 1000)
-                self.detectionState.rapidChangeMode = isRapidChange
-                
-                if let lastFrame = self.lastFrameTime {
-                    let elapsed = currentTime.timeIntervalSince(lastFrame)
-                    self.detectionState.frameRate = elapsed > 0 ? Float(1.0 / elapsed) : 0
-                }
-            }
-            
-            #if DEBUG
-            print("QRCodeDetector: Detected QR: \(payload) (confidence: \(bestResult.confidence))")
-            #endif
-        } else {
-            DispatchQueue.main.async {
-                self.detectionState.isDetected = false
-            }
+            lastContentChangeTime = currentTime
         }
         
-        lastFrameTime = processingEnd
+        previousQRContent = payload
+        lastDetectionTime = currentTime
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.detectionState.isDetected = true
+            self?.detectionState.lastDetectionTime = currentTime
+            self?.detectionState.detectionCount += 1
+            self?.detectionState.lastQRContent = payload
+            self?.detectionState.detectedContent = payload
+        }
+        
+        print("QRCodeDetector: Detected QR - \(payload)")
+    }
+    
+    private func updatePerformanceMetrics(_ processingTime: TimeInterval) {
+        totalProcessingTime += processingTime
+        let avgTime = Float(totalProcessingTime) / Float(max(frameCount, 1))
+        
+        var frameRate: Float = 0
+        if let lastTime = lastFrameTime {
+            let interval = Date().timeIntervalSince(lastTime)
+            frameRate = Float(1.0 / interval)
+        }
+        lastFrameTime = Date()
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.detectionState.avgProcessingTime = avgTime * 1000 // Convert to ms
+            self?.detectionState.frameRate = frameRate
+        }
     }
 }
 
@@ -276,75 +270,95 @@ class QRCodeDetector: NSObject, ObservableObject {
 extension QRCodeDetector: AVCaptureVideoDataOutputSampleBufferDelegate {
     
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {
-        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
-        
         frameCount += 1
         
         // Skip frames in walking mode for performance
-        if isWalkingMode && frameCount % 3 != 0 {
+        if detectionState.scanMode == .walking && frameCount % frameSkip != 0 {
             return
         }
         
-        let requestHandler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        let startTime = Date()
         
-        do {
-            try requestHandler.perform([detectBarcodeRequest])
-        } catch {
-            print("QRCodeDetector: Failed to perform detection: \(error)")
+        guard let pixelBuffer = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
+        
+        // Create Vision request
+        let request = VNDetectBarcodesRequest { [weak self] request, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("QRCodeDetector: Vision error - \(error)")
+                return
+            }
+            
+            guard let results = request.results as? [VNBarcodeObservation] else { return }
+            
+            // Process QR codes
+            for observation in results {
+                if observation.symbology == .qr {
+                    self.processQRCode(observation)
+                }
+            }
+            
+            // Update clear state if no QR found
+            if results.isEmpty {
+                DispatchQueue.main.async {
+                    // Keep detected state for persistence window
+                    if let lastTime = self.detectionState.lastDetectionTime,
+                       Date().timeIntervalSince(lastTime) > 3.0 {
+                        self.detectionState.isDetected = false
+                        self.detectionState.detectedContent = nil
+                    }
+                }
+            }
         }
+        
+        request.symbologies = [.qr]
+        
+        // Perform request
+        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
+        do {
+            try handler.perform([request])
+        } catch {
+            print("QRCodeDetector: Failed to perform request - \(error)")
+        }
+        
+        // Update metrics
+        let processingTime = Date().timeIntervalSince(startTime)
+        updatePerformanceMetrics(processingTime)
     }
 }
 
 // MARK: - QR ID Extractor
 
-/// Utility for extracting numeric IDs from QR content
-enum QRIdExtractor {
+/// Utility for extracting numeric ID from QR code content
+struct QRIdExtractor {
     
-    /// Extract numeric ID from QR content
-    static func extractQRCodeId(_ qrContent: String?) -> String? {
-        guard let content = qrContent, !content.isEmpty else { return nil }
+    /// Extract numeric QR code ID from content
+    /// Expected format: "QR_Id:https://qrco.de/..." or just numeric
+    static func extractQRCodeId(_ content: String) -> String? {
+        // Try to extract from "QR_Id:" prefix
+        if content.hasPrefix("QR_Id:") {
+            let idPart = content.replacingOccurrences(of: "QR_Id:", with: "")
+            // Extract numeric part from URL or direct value
+            if let numericPart = idPart.split(separator: "/").last {
+                return String(numericPart)
+            }
+            return idPart
+        }
         
-        // Handle specific format: "QR_Id:https://qrco.de/bgErvr"
-        if content.hasPrefix("QR_Id:") && content.contains("qrco.de/") {
-            if let urlCode = content.components(separatedBy: "qrco.de/").last {
-                return convertUrlCodeToNumber(urlCode)
+        // Try to extract numeric ID from URL
+        if content.contains("qrco.de") {
+            if let lastPart = content.split(separator: "/").last {
+                return String(lastPart)
             }
         }
         
-        // Look for existing numbers in content
-        let numberPattern = try? NSRegularExpression(pattern: "\\d+", options: [])
-        if let matches = numberPattern?.matches(in: content, options: [], range: NSRange(content.startIndex..., in: content)),
-           let firstMatch = matches.first,
-           let range = Range(firstMatch.range, in: content) {
-            return String(content[range])
+        // Check if content is already numeric
+        if content.allSatisfy({ $0.isNumber }) {
+            return content
         }
         
-        // Hash any other content to a consistent number
-        return hashToNumber(content)
-    }
-    
-    private static func convertUrlCodeToNumber(_ urlCode: String) -> String {
-        guard !urlCode.isEmpty else { return "0" }
-        
-        var numericValue: Int = 0
-        
-        for (index, char) in urlCode.enumerated() {
-            let charValue: Int
-            if char.isNumber {
-                charValue = char.wholeNumberValue ?? 0
-            } else if char.isLetter {
-                charValue = Int(char.lowercased().unicodeScalars.first!.value) - Int(Unicode.Scalar("a").value) + 10
-            } else {
-                charValue = Int(char.unicodeScalars.first?.value ?? 0) % 36
-            }
-            numericValue += charValue * (36 * index + 1)
-        }
-        
-        return String(abs(numericValue) % 999999)
-    }
-    
-    private static func hashToNumber(_ content: String) -> String {
-        let hash = content.hashValue
-        return String(abs(hash) % 999999)
+        // Return raw content as fallback
+        return content
     }
 }

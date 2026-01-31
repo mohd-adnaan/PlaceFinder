@@ -3,7 +3,7 @@
 //  IndoorNavigationTACME
 //
 //  Core IMU sensor processing - CoreMotion implementation
-//  FIXED: All 7 compilation errors resolved
+//  FIXED: All compilation errors resolved
 //
 
 import Foundation
@@ -15,20 +15,7 @@ class IMUSensorManager: ObservableObject {
     
     // MARK: - Published State
     
-    @Published var imuState = IMUState(
-        position: Position(),
-        stepCount: 0,
-        isCalibrated: false,
-        accelerationMagnitude: 0,
-        isMoving: false,
-        currentStepLength: 0.65,
-        filterQuality: "Initializing",
-        beta: 0.6,
-        isStepCalibrationValid: false,
-        isCalibrating: false,
-        calibrationStepCount: 0,
-        bearing: 0
-    )
+    @Published var imuState = IMUState()
     
     // MARK: - Private Properties
     
@@ -43,9 +30,9 @@ class IMUSensorManager: ObservableObject {
     
     // Acceleration processing
     private var filteredAcceleration: [Double] = []
-    private var accelerationVariances: [Double] = []  // FIX 1: Added missing property
-    private var detectedPeaks: [Double] = []          // FIX 2: Added missing property
-    private var filterBuffer: [Double] = []           // FIX 3: Added missing property
+    private var accelerationVariances: [Double] = []
+    private var detectedPeaks: [Double] = []
+    private var filterBuffer: [Double] = []
     private var lastPeak: Double = 0
     private var lastValley: Double = 0
     private var peakConfirmed = false
@@ -261,7 +248,7 @@ class IMUSensorManager: ObservableObject {
         // Detect steps
         detectStep(filteredValue)
         
-        // Update state - FIX 4: Cast to Float explicitly
+        // Update state
         updateState(accelerationMagnitude: Float(abs(filteredValue)))
     }
     
@@ -337,7 +324,7 @@ class IMUSensorManager: ObservableObject {
                 lastStepTime = currentTime
                 updatePositionFromStep()
                 
-                // FIX 5: Notify calibration manager with correct argument labels
+                // Notify calibration manager
                 calibrationManager?.updateCalibration(
                     currentImuPosition: getCurrentPosition(),
                     stepCount: stepCount
@@ -370,7 +357,6 @@ class IMUSensorManager: ObservableObject {
         let isMoving = recentStepPeriods.count > 0 &&
                       (lastStepTime.map { Date().timeIntervalSince($0) < 2.0 } ?? false)
         
-        // FIX 6: Use isCalibrationValid() instead of isCalibrated
         let isCalibrated = calibrationManager?.isCalibrationValid() ?? false
         
         DispatchQueue.main.async { [weak self] in

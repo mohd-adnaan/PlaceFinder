@@ -41,19 +41,14 @@ struct NavigationScreen: View {
                         doubleTapHintView
                     }
                     
-                    // Status indicator - NOW INTERACTIVE
+                    // Status indicator
                     StatusIndicatorView(
                         isNavigating: navigationManager.navigationState.isNavigating,
                         isCalibrated: navigationManager.navigationState.isCalibrated,
                         ttsReady: ttsManager.ttsState.isReady,
                         qrDetectionActive: navigationManager.navigationState.qrDetectionActive,
                         qrDetected: qrDetector.detectionState.isDetected,
-                        conversationActive: conversationManager.conversationState.isActive,
-                        onNavTap: handleNavTap,
-                        onCalTap: handleCalTap,
-                        onTtsTap: handleTtsTap,
-                        onQrTap: handleQrTap,
-                        onAiTap: handleAiTap
+                        conversationActive: conversationManager.conversationState.isActive
                     )
                     
                     // Navigation input section with proper dropdowns
@@ -119,11 +114,11 @@ struct NavigationScreen: View {
         }
         .onAppear {
             // Initialize sensors when view appears
-            sensorManager.startUpdates()
+            sensorManager.startSensors()
         }
         .onDisappear {
             // Stop sensors when view disappears
-            sensorManager.stopUpdates()
+            sensorManager.stopSensors()
         }
         .overlay(doubleTapFeedbackOverlay)
     }
@@ -205,60 +200,6 @@ struct NavigationScreen: View {
         .animation(.easeInOut(duration: 0.3), value: showDoubleTapFeedback)
     }
     
-    // MARK: - Status Button Actions
-    
-    private func handleNavTap() {
-        if navigationManager.navigationState.isNavigating {
-            stopNavigation()
-        } else if navigationManager.navigationState.isInitialized {
-            startNavigation()
-        } else {
-            // Provide feedback that we need to initialize first
-            ttsManager.speak("Please initialize the server first by entering source and destination.")
-        }
-    }
-    
-    private func handleCalTap() {
-        // Toggle calibration sheet or start step calibration
-        if sensorManager.imuState.isCalibrating {
-            sensorManager.completeStepCalibration()
-            ttsManager.speak("Calibration completed. Beta factor: \(String(format: "%.3f", sensorManager.imuState.beta))")
-        } else {
-            sensorManager.startStepCalibration()
-            ttsManager.speak("Calibration started. Walk 20 meters and tap again to complete.")
-        }
-    }
-    
-    private func handleTtsTap() {
-        // Toggle TTS
-        let newState = !ttsManager.ttsState.isEnabled
-        ttsManager.setEnabled(newState)
-        
-        if newState {
-            ttsManager.speak("Voice guidance enabled")
-        }
-    }
-    
-    private func handleQrTap() {
-        // Toggle QR scanning
-        if qrDetector.detectionState.isScanning {
-            qrDetector.stopScanning()
-            ttsManager.speak("QR scanning stopped")
-        } else {
-            qrDetector.startScanning()
-            ttsManager.speak("QR scanning started. Point your camera at a QR code.")
-        }
-    }
-    
-    private func handleAiTap() {
-        // Toggle AI conversation
-        if conversationManager.conversationState.isActive {
-            conversationManager.stopConversationMode()
-        } else {
-            conversationManager.startConversationMode()
-        }
-    }
-    
     // MARK: - Navigation Actions
     
     private func initializeServer() {
@@ -278,7 +219,6 @@ struct NavigationScreen: View {
             
             switch result {
             case .success:
-                // TTS announcement is handled in NavigationManager
                 print("NavigationScreen: Server initialized successfully")
             case .failure(let error):
                 print("NavigationScreen: Server initialization failed: \(error)")
@@ -295,7 +235,6 @@ struct NavigationScreen: View {
             
             switch result {
             case .success:
-                // Start QR detection for drift correction
                 qrDetector.startScanning()
                 print("NavigationScreen: Navigation started")
             case .failure(let error):
@@ -314,21 +253,15 @@ struct NavigationScreen: View {
     }
     
     private func resetAll() {
-        // Stop everything
         navigationManager.stopNavigation()
         conversationManager.stopConversationMode()
         qrDetector.stopScanning()
-        
-        // Reset sensors
         sensorManager.resetPosition()
         calibrationManager.resetCalibration()
-        
-        // Reset UI state
         source = ""
         destination = ""
         useClockDirections = false
         useLandmarks = false
-        
         ttsManager.speak("All settings reset")
     }
     
@@ -339,37 +272,28 @@ struct NavigationScreen: View {
     }
     
     private func refreshState() {
-        // Force refresh all manager states
         sensorManager.clearAccumulatedData()
         qrDetector.resetDetection()
-        
-        // Provide feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
-        
         ttsManager.speak("State refreshed")
     }
     
     private func activateVoiceInput() {
         guard conversationManager.conversationState.isActive else {
-            // Start conversation mode if not active
             conversationManager.startConversationMode()
             return
         }
         
-        // Show feedback
         withAnimation {
             showDoubleTapFeedback = true
         }
         
-        // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
         
-        // Start listening
         conversationManager.startListening()
         
-        // Hide feedback after delay
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             withAnimation {
                 showDoubleTapFeedback = false
@@ -383,9 +307,6 @@ struct NavigationScreen: View {
 struct DoubleTapContainer<Content: View>: View {
     let onDoubleTap: () -> Void
     let content: () -> Content
-    
-    @State private var lastTapTime: Date = Date.distantPast
-    private let doubleTapInterval: TimeInterval = 0.5
     
     var body: some View {
         content()

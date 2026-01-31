@@ -235,9 +235,9 @@ struct ConversationSection_Previews: PreviewProvider {
                     errorMessage: nil,
                     lastError: nil,
                     messages: [
-                        ChatMessage(content: "How do I get to the elevator?", isUser: true, timestamp: Date().addingTimeInterval(-120)),
-                        ChatMessage(content: "From Room 101, go straight for 20 meters, then turn right. The elevator will be on your left.", isUser: false, timestamp: Date().addingTimeInterval(-60)),
-                        ChatMessage(content: "Thanks! What floor is the cafeteria on?", isUser: true, timestamp: Date())
+                        ChatMessage(content: "How do I get to the elevator?", isUser: true),
+                        ChatMessage(content: "From Room 101, go straight for 20 meters, then turn right. The elevator will be on your left.", isUser: false),
+                        ChatMessage(content: "Thanks! What floor is the cafeteria on?", isUser: true)
                     ],
                     extractedIntent: nil
                 ),

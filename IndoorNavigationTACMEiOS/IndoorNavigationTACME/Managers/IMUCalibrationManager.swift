@@ -3,13 +3,12 @@
 //  IndoorNavigationTACME
 //
 //  Manages IMU calibration and coordinate system transformations
-//  FIXED: CalibrationState struct now defined in this file
 //
 
 import Foundation
 import Combine
 
-// MARK: - Calibration State Model
+// MARK: - Calibration State
 
 /// State tracking for IMU calibration
 struct CalibrationState {
@@ -125,7 +124,7 @@ class IMUCalibrationManager: ObservableObject {
             mapBearing = imuPosition.bearing
         }
         
-        return Position(x: mapX, y: mapY, bearing: mapBearing, timestamp: imuPosition.timestamp)
+        return Position(x: mapX, y: mapY, bearing: mapBearing)
     }
     
     /// Update calibration confidence based on movement
@@ -245,20 +244,5 @@ class IMUCalibrationManager: ObservableObject {
             normalized += 360
         }
         return normalized
-    }
-    
-    private func calculateBearingOffset(_ mapBearing: Double, _ imuBearing: Double) -> Double {
-        var offset = mapBearing - imuBearing
-        
-        // Handle wrap-around
-        if abs(offset) > bearingWrapThreshold {
-            if offset > 0 {
-                offset -= 360
-            } else {
-                offset += 360
-            }
-        }
-        
-        return offset
     }
 }

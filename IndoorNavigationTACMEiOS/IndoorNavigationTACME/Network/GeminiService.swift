@@ -2,8 +2,6 @@
 //  GeminiService.swift
 //  IndoorNavigationTACME
 //
-//  Service for Google Gemini API communication
-//
 
 import Foundation
 
@@ -12,9 +10,13 @@ actor GeminiService {
     
     // MARK: - Properties
     
+    // FIXED: Use v1beta which supports gemini-2.0-flash
     private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models"
     private let session: URLSession
     private var apiKey: String?
+    
+    // FIXED: Default model updated from "gemini-1.5-flash" to "gemini-2.0-flash"
+    static let defaultModel = "gemini-2.0-flash"
     
     // MARK: - Singleton
     
@@ -29,24 +31,28 @@ actor GeminiService {
         self.session = URLSession(configuration: configuration)
         
         // Load API key from environment or configuration
-        // Try loading from Info.plist
         if let key = Bundle.main.object(forInfoDictionaryKey: "GEMINI_API_KEY") as? String,
            !key.isEmpty, !key.contains("$(") {
             self.apiKey = key
+            print("GeminiService: API key loaded from Info.plist")
         } else if let key = ProcessInfo.processInfo.environment["GEMINI_API_KEY"], !key.isEmpty {
             self.apiKey = key
+            print("GeminiService: API key loaded from environment")
         } else if let key = UserDefaults.standard.string(forKey: "GEMINI_API_KEY"), !key.isEmpty {
             self.apiKey = key
+            print("GeminiService: API key loaded from UserDefaults")
         } else {
-            print("Warning: Gemini API key not found")
+            print("⚠️ GeminiService: Gemini API key not found! AI features will not work.")
+            print("   Add GEMINI_API_KEY to Info.plist or environment variables")
         }
     }
     
     // MARK: - Public Methods
     
-    /// Set API key
+    /// Set API key programmatically
     func setAPIKey(_ key: String) {
         self.apiKey = key
+        print("GeminiService: API key set programmatically")
     }
     
     /// Check if API is configured
@@ -60,7 +66,8 @@ actor GeminiService {
             throw GeminiError.missingAPIKey
         }
         
-        let model = request.model ?? "gemini-1.5-flash"
+        // FIXED: Use gemini-2.0-flash as default instead of gemini-1.5-flash
+        let model = request.model ?? GeminiService.defaultModel
         guard let url = URL(string: "\(baseURL)/\(model):generateContent?key=\(apiKey)") else {
             throw GeminiError.invalidURL
         }
@@ -108,7 +115,7 @@ actor GeminiService {
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
         
         #if DEBUG
-        print("Gemini Request: \(request.messages.last?.content.prefix(100) ?? "empty")")
+        print("Gemini Request to model '\(model)': \(request.messages.last?.content.prefix(100) ?? "empty")")
         #endif
         
         let (data, response) = try await session.data(for: urlRequest)
@@ -119,7 +126,7 @@ actor GeminiService {
         
         guard (200...299).contains(httpResponse.statusCode) else {
             if let errorString = String(data: data, encoding: .utf8) {
-                print("Gemini Error Response: \(errorString)")
+                print("Gemini Error Response (\(httpResponse.statusCode)): \(errorString)")
                 
                 // Try to parse error message
                 if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -169,7 +176,7 @@ actor GeminiService {
         return response.text
     }
     
-    /// Chat completion compatible method (for easier migration from OpenAI)
+    /// Chat completion compatible method
     func chatCompletion(messages: [GeminiMessage], maxTokens: Int = 1000, temperature: Double = 0.7) async throws -> String {
         let request = GeminiRequest(
             messages: messages,
@@ -190,7 +197,8 @@ struct GeminiRequest {
     let maxTokens: Int
     let temperature: Double
     
-    init(model: String? = "gemini-1.5-flash", messages: [GeminiMessage], maxTokens: Int = 1000, temperature: Double = 0.7) {
+    // FIXED: Default model is now gemini-2.0-flash
+    init(model: String? = GeminiService.defaultModel, messages: [GeminiMessage], maxTokens: Int = 1000, temperature: Double = 0.7) {
         self.model = model
         self.messages = messages
         self.maxTokens = maxTokens
@@ -220,7 +228,7 @@ enum GeminiError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingAPIKey:
-            return "Gemini API key not configured"
+            return "Gemini API key not configured. Add GEMINI_API_KEY to Info.plist."
         case .invalidURL:
             return "Invalid API URL"
         case .invalidResponse:
@@ -228,7 +236,7 @@ enum GeminiError: LocalizedError {
         case .httpError(let statusCode):
             return "Gemini HTTP error: \(statusCode)"
         case .apiError(let message):
-            return "Gemini API error: \(message)"
+            return "AI service error: \(message)"
         case .decodingError:
             return "Failed to decode Gemini response"
         }

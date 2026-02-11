@@ -2,9 +2,6 @@
 //  IndoorNavigationTACMEApp.swift
 //  IndoorNavigationTACME
 //
-//  iOS Implementation of Indoor Navigation System
-//  Converted from Android Kotlin app
-//
 
 import SwiftUI
 
@@ -20,7 +17,6 @@ struct IndoorNavigationTACMEApp: App {
     @StateObject private var languageManager = LanguageManager()
     
     init() {
-        // Configure app-wide settings
         configureApp()
     }
     
@@ -41,15 +37,31 @@ struct IndoorNavigationTACMEApp: App {
     }
     
     private func configureApp() {
-        // Configure logging
         #if DEBUG
-        print("IndoorNavigationTACME: Debug mode enabled")
+        print("")
+        print("╔════════════════════════════════════════════════════════════╗")
+        print("║       IndoorNavigationTACME - iOS Version                  ║")
+        print("║       Server: Railway (indoornavigationtacme)              ║")
+        print("╚════════════════════════════════════════════════════════════╝")
+        print("")
         #endif
     }
     
     private func setupManagers() {
-        // Wire up manager dependencies
+        print("🚀 === INITIALIZING PLACEFINDER iOS ===")
+        print("")
+        
+        // === STEP 1: Load POI Names (CRITICAL) ===
+        print("📍 STEP 1: Loading POI names from map_data.json...")
+        let poiNames = loadPOINames()
+        print("")
+        
+        // === STEP 2: Configure Managers ===
+        print("🔧 STEP 2: Configuring managers...")
+        
         calibrationManager.setSensorManager(sensorManager)
+        print("   ✓ CalibrationManager")
+        
         navigationManager.configure(
             calibrationManager: calibrationManager,
             sensorManager: sensorManager,
@@ -57,22 +69,77 @@ struct IndoorNavigationTACMEApp: App {
             qrDetector: qrDetector,
             languageManager: languageManager
         )
+        print("   ✓ NavigationManager")
+        
         conversationManager.configure(
             ttsManager: ttsManager,
             languageManager: languageManager
         )
+        print("   ✓ ConversationManager")
+        
         ttsManager.setLanguageManager(languageManager)
+        print("   ✓ TTSManager")
+        print("")
         
-        // Load POI names
-        if let poiNames = POIExtractor.extractPOINames(fileName: "map_data") {
-            navigationManager.setPOINames(poiNames)
+        // === STEP 3: Set POI Names ===
+        print("📋 STEP 3: Setting POI names for navigation...")
+        if let names = poiNames {
+            navigationManager.setPOINames(names)
+            print("   ✅ Loaded \(names.count) locations")
+            print("   📍 Examples: \(names.prefix(3).joined(separator: ", "))...")
+        } else {
+            print("   ⚠️ NO POI NAMES LOADED - DROPDOWNS WILL BE EMPTY!")
+            print("")
+            print("   🔴 FIX REQUIRED:")
+            print("      1. Add map_data.json to Xcode project")
+            print("      2. Ensure 'Copy items if needed' is checked")
+            print("      3. Ensure 'Add to targets' includes this app")
+            print("      4. Check Build Phases → Copy Bundle Resources")
+            navigationManager.setPOINames([])
         }
+        print("")
         
-        // Preload common phrases for translation
+        // === STEP 4: Preload Translations ===
+        print("🌐 STEP 4: Preloading translations...")
         Task {
             await languageManager.preloadCommonPhrases()
+            print("   ✓ Translations ready")
         }
         
-        print("IndoorNavigationTACME: All managers initialized successfully")
+        // === COMPLETE ===
+        print("")
+        print("═══════════════════════════════════════════════════════════════")
+        if poiNames != nil {
+            print("✅ IndoorNavigationTACME READY!")
+            print("   → Select source and destination")
+            print("   → Tap 'Initialize Server' to connect")
+            print("   → Tap 'Start Navigation' to begin")
+        } else {
+            print("⚠️ IndoorNavigationTACME started with ERRORS")
+            print("   Navigation will NOT work until map_data.json is added")
+        }
+        print("═══════════════════════════════════════════════════════════════")
+        print("")
+    }
+    
+    /// Load POI names with fallback options
+    private func loadPOINames() -> [String]? {
+        // Try primary file
+        if let names = POIExtractor.extractPOINames(fileName: "map_data") {
+            return names
+        }
+        
+        // Try fallbacks
+        let fallbacks = ["map_dataTr", "mapData", "MapData"]
+        print("   ⚠️ Primary file not found, trying fallbacks...")
+        
+        for fallback in fallbacks {
+            if let names = POIExtractor.extractPOINames(fileName: fallback) {
+                print("   ✅ Found POIs in: \(fallback).json")
+                return names
+            }
+        }
+        
+        return nil
     }
 }

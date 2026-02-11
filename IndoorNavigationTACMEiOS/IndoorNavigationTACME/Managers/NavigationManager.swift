@@ -2,14 +2,11 @@
 //  NavigationManager.swift
 //  IndoorNavigationTACME
 //
-//  Core navigation manager with smart QR synchronization
-//
 
 import Foundation
 import Combine
 import UIKit
 
-/// Core navigation manager coordinating all navigation components
 class NavigationManager: ObservableObject {
     
     // MARK: - Published Properties
@@ -28,7 +25,7 @@ class NavigationManager: ObservableObject {
     // Session management
     private var sessionId: String = "ios_session_\(Int(Date().timeIntervalSince1970 * 1000))"
     
-    // Update task
+    // Update tasks
     private var updateTask: Task<Void, Never>?
     private var qrMonitoringTask: Task<Void, Never>?
     
@@ -44,19 +41,27 @@ class NavigationManager: ObservableObject {
     
     // Bearing correction
     private var pathBearings: [Double] = []
+    private var pathCoordinates: [[Double]] = []
     private var currentSegmentId: Int = -1
     private var bearingCorrectionCount: Int = 0
     private let bearingCorrectionThreshold: Double = 25.0
     
-    // Constants
-    private let updateIntervalMs: UInt64 = 50
+    // Step tracking
+    private var lastStepCount: Int = 0
+    private var lastInstructionText: String = ""
+    private var lastInstructionTime: Date = Date.distantPast
+    private var updateCount: Int = 0
+    
+    // Constants - MATCHING ANDROID
+    private let updateIntervalMs: UInt64 = 50  // Android uses 50ms
+    private let minInstructionInterval: TimeInterval = 1.5
     private let maxRetryAttempts = 3
     private let retryDelayMs: UInt64 = 2000
     
-    // Step tracking
-    private var lastStepCount: Int = 0
+    // Retry tracking
+    private var retryCount: Int = 0
     
-    // MARK: - Initialization
+    // MARK: - Init
     
     init() {
         print("NavigationManager: Initialized")
@@ -64,7 +69,6 @@ class NavigationManager: ObservableObject {
     
     // MARK: - Configuration
     
-    /// Configure manager dependencies
     func configure(
         calibrationManager: IMUCalibrationManager,
         sensorManager: IMUSensorManager,
@@ -77,12 +81,10 @@ class NavigationManager: ObservableObject {
         self.ttsManager = ttsManager
         self.qrDetector = qrDetector
         self.languageManager = languageManager
-        
         calibrationManager.setSensorManager(sensorManager)
         print("NavigationManager: Dependencies configured")
     }
     
-    /// Set available POI names
     func setPOINames(_ names: [String]) {
         poiNames = names
         print("NavigationManager: Set \(names.count) POI names")
@@ -90,7 +92,6 @@ class NavigationManager: ObservableObject {
     
     // MARK: - Navigation Control
     
-    /// Initialize navigation with server
     func initializeWithServer(
         source: String,
         destination: String,
@@ -98,11 +99,23 @@ class NavigationManager: ObservableObject {
         useLandmarks: Bool,
         conversationMode: Bool = false
     ) async -> Result<Void, Error> {
+        print("")
+        print("═══════════════════════════════════════════════════════")
         print("NavigationManager: Initializing with server")
         print("  Source: \(source)")
         print("  Destination: \(destination)")
+        print("  Clock Directions: \(useClockDirections)")
+        print("  Landmarks: \(useLandmarks)")
+        print("═══════════════════════════════════════════════════════")
         
-        navigationState.initializationStep = .notStarted
+        await MainActor.run {
+            navigationState.initializationStep = .connecting
+            navigationState.errorMessage = nil
+            navigationState.currentInstruction = "Connecting to server..."
+        }
+        
+        sessionId = "ios_session_\(Int(Date().timeIntervalSince1970 * 1000))"
+        await NavigationAPIService.shared.resetSession()
         
         let request = InitializeRequest(
             source: source,
@@ -115,24 +128,36 @@ class NavigationManager: ObservableObject {
         do {
             let response = try await NavigationAPIService.shared.initialize(request: request)
             
+            print("NavigationManager: Response status: \(response.status)")
+            print("NavigationManager: Message: \(response.message ?? "nil")")
+            print("NavigationManager: Instructions: \(response.instructions ?? "nil")")
+            
             guard response.status == "success" else {
-                throw NavigationError.serverError(response.message ?? "Unknown error")
+                throw NSError(domain: "Nav", code: -1, userInfo: [
+                    NSLocalizedDescriptionKey: response.message ?? "Server initialization failed"
+                ])
             }
             
             // Store calibration data
             if let calibration = response.calibration {
                 tempCalibrationData = calibration
-                print("NavigationManager: Received calibration data")
-                print("  Start position: (\(calibration.mapStartX), \(calibration.mapStartY))")
-                if let bearing = calibration.initialBearing {
-                    print("  Initial bearing: \(bearing)°")
-                }
+                print("NavigationManager: ✓ Calibration data: start=(\(calibration.mapStartX), \(calibration.mapStartY)), bearing=\(calibration.initialBearing ?? 0)°")
             }
             
-            // Store path bearings for bearing correction
+            // Store path bearings for bearing correction (matching Android)
             if let bearings = response.pathBearings {
-                storePathBearings(bearings)
+                pathBearings = bearings
+                // Immediately provide to sensor manager
+                sensorManager?.setBearingCorrectionData(bearings, currentSegmentId)
+                print("NavigationManager: ✓ Stored \(bearings.count) path bearings")
             }
+            
+            if let coords = response.pathCoordinates {
+                pathCoordinates = coords
+                print("NavigationManager: ✓ Stored \(coords.count) path coordinates")
+            }
+            
+            let serverMessage = response.instructions ?? response.message ?? "Server connected"
             
             await MainActor.run {
                 navigationState.isInitialized = true
@@ -141,89 +166,110 @@ class NavigationManager: ObservableObject {
                 navigationState.useClockDirections = useClockDirections
                 navigationState.useLandmarks = useLandmarks
                 navigationState.initializationStep = .initialized
-                navigationState.currentInstruction = response.message ?? "Server connected! Ready to start navigation."
+                navigationState.serverResponse = serverMessage
+                navigationState.currentInstruction = "Ready! Tap Start Navigation."
                 navigationState.lastUpdateTime = Date()
+                navigationState.errorMessage = nil
             }
             
-            // Announce readiness
-            let message = languageManager?.getString("Server connected! Ready to start navigation.") ??
-                         "Server connected! Ready to start navigation."
-            ttsManager?.speak(message, force: true)
-            
+            ttsManager?.speak("Server connected. Ready to start navigation.", force: true)
             return .success(())
             
         } catch {
-            print("NavigationManager: Initialization failed: \(error)")
+            print("NavigationManager: ✗ Initialization failed: \(error)")
             await MainActor.run {
                 navigationState.initializationStep = .error
-                navigationState.errorMessage = "Connection error: \(error.localizedDescription)"
+                navigationState.errorMessage = error.localizedDescription
+                navigationState.currentInstruction = "Connection failed: \(error.localizedDescription)"
             }
+            ttsManager?.speakCritical("Connection failed")
             return .failure(error)
         }
     }
     
-    /// Start navigation with calibration
     func startNavigationWithCalibration() async -> Result<Void, Error> {
-        print("NavigationManager: Starting navigation with calibration")
+        print("")
+        print("═══════════════════════════════════════════════════════")
+        print("NavigationManager: Starting Navigation with Calibration")
+        print("═══════════════════════════════════════════════════════")
         
         guard navigationState.isInitialized else {
-            return .failure(NavigationError.notInitialized)
+            ttsManager?.speakCritical("Please initialize first")
+            return .failure(NSError(domain: "Nav", code: -1, userInfo: [NSLocalizedDescriptionKey: "Not initialized"]))
         }
         
         guard let calibration = tempCalibrationData else {
-            return .failure(NavigationError.noCalibrationData)
+            ttsManager?.speakCritical("No calibration data from server")
+            return .failure(NSError(domain: "Nav", code: -2, userInfo: [NSLocalizedDescriptionKey: "No calibration data"]))
         }
         
-        // Reset sensors
+        // Reset sensors before calibration
         sensorManager?.resetPosition()
+        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms settle time
         
-        // Wait for sensor reset
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-        
-        // Get current IMU position
-        guard let currentPosition = sensorManager?.getCurrentPosition() else {
-            return .failure(NavigationError.sensorError)
+        // Get current IMU position after reset
+        guard let currentImuPosition = sensorManager?.getCurrentPosition() else {
+            return .failure(NSError(domain: "Nav", code: -3, userInfo: [NSLocalizedDescriptionKey: "Sensor error"]))
         }
         
-        // Perform calibration
+        // Calibrate using map position from server
         let success = calibrationManager?.calibrateWithMapPosition(
-            currentImuPosition: currentPosition,
+            currentImuPosition: currentImuPosition,
             mapX: calibration.mapStartX,
             mapY: calibration.mapStartY,
             mapBearing: calibration.initialBearing,
-            stepCount: 0
+            stepCount: sensorManager?.imuState.stepCount ?? 0
         ) ?? false
         
-        guard success else {
-            return .failure(NavigationError.calibrationFailed)
+        if !success {
+            print("NavigationManager: ✗ Calibration failed!")
+            ttsManager?.speakCritical("Calibration failed")
+            return .failure(NSError(domain: "Nav", code: -3, userInfo: [NSLocalizedDescriptionKey: "Calibration failed"]))
         }
         
-        // Start navigation
+        print("NavigationManager: ✓ Calibration successful")
+        
+        // Reset tracking state
+        lastStepCount = sensorManager?.imuState.stepCount ?? 0
+        lastInstructionText = ""
+        lastInstructionTime = Date.distantPast
+        updateCount = 0
+        retryCount = 0
+        
         await MainActor.run {
-            navigationState.isNavigating = true
             navigationState.isCalibrated = true
+            navigationState.isNavigating = true
             navigationState.initializationStep = .navigating
-            navigationState.currentInstruction = "Navigation started"
+            navigationState.currentInstruction = "Starting navigation..."
+            navigationState.qrDetectionActive = true
+            navigationState.qrSyncMode = "SMART_SYNC"
         }
         
         // Start QR detection
-        startQRDetection()
+        qrDetector?.startScanning()
         
-        // Start position update loop
-        startPositionUpdates()
-        
-        // Announce start
-        let message = languageManager?.getString("navigation started") ?? "Navigation started"
+        let message = languageManager?.isFrench() == true
+            ? (await languageManager?.translateFromEnglish("Navigation started") ?? "Navigation started")
+            : "Navigation started"
         ttsManager?.speak(message, force: true)
+        
+        // Send first position update immediately at calibration point
+        print("NavigationManager: Sending FIRST position update at calibration point...")
+        await sendFirstPositionUpdate()
+        
+        // Start continuous update loop
+        startPositionUpdateLoop()
+        
+        // Start QR monitoring
+        startQRMonitoring()
         
         return .success(())
     }
     
-    /// Stop navigation
     func stopNavigation() {
         print("NavigationManager: Stopping navigation")
         
-        // Cancel update tasks
+        // Cancel tasks
         updateTask?.cancel()
         updateTask = nil
         qrMonitoringTask?.cancel()
@@ -232,8 +278,10 @@ class NavigationManager: ObservableObject {
         // Stop QR detection
         qrDetector?.stopScanning()
         
-        // Reset QR sync state
-        resetQRSyncState()
+        // Reset QR state
+        currentQRId = nil
+        currentQRDetectionTime = nil
+        lastSentQRId = nil
         
         // Update state
         navigationState.isNavigating = false
@@ -245,7 +293,6 @@ class NavigationManager: ObservableObject {
         navigationState.qrDetectionActive = false
         navigationState.qrSyncMode = "DISABLED"
         
-        // Announce stop
         ttsManager?.speakPriority("Navigation stopped")
         
         // Reset sensors and calibration
@@ -254,10 +301,9 @@ class NavigationManager: ObservableObject {
         tempCalibrationData = nil
     }
     
-    /// Force a position update
     func forcePositionUpdate() async -> Result<String, Error> {
         guard let mapPosition = sensorManager?.getCurrentMapPosition() else {
-            return .failure(NavigationError.sensorError)
+            return .failure(NSError(domain: "Nav", code: -4, userInfo: [NSLocalizedDescriptionKey: "Sensor error"]))
         }
         
         let (qrDetected, qrId) = getSmartQRState()
@@ -272,77 +318,94 @@ class NavigationManager: ObservableObject {
         
         do {
             let response = try await NavigationAPIService.shared.updatePosition(request: request)
-            
-            if let instruction = response.instructions {
-                await MainActor.run {
-                    navigationState.currentInstruction = instruction
-                    navigationState.lastUpdateTime = Date()
-                }
-                return .success(instruction)
-            }
-            
-            return .failure(NavigationError.noInstruction)
+            await handleNavigationResponse(response, isFirstUpdate: false)
+            return .success(response.instructions ?? response.message ?? "OK")
         } catch {
             return .failure(error)
         }
     }
     
-    /// Test QR detection system
-    func testQRDetection() {
-        print("NavigationManager: Testing QR detection system")
-        qrDetector?.testVisionCapabilities()
-        print("QR Stats: \(qrDetector?.getDetectionStats() ?? [:])")
-        print("Smart QR Info: \(getSmartQRInfo())")
+    // MARK: - Smart QR Sync (matching Android)
+    
+    private func getSmartQRState() -> (Bool, String?) {
+        guard let qrId = currentQRId,
+              let detectionTime = currentQRDetectionTime else {
+            return (false, nil)
+        }
+        
+        let elapsed = Date().timeIntervalSince(detectionTime)
+        
+        // Within persistence window
+        if elapsed <= qrPersistenceWindow {
+            // Don't re-send same QR unless it's a fresh detection
+            if qrId == lastSentQRId && elapsed > qrChangeDetectionWindow {
+                return (false, nil)
+            }
+            return (true, qrId)
+        }
+        
+        // Expired
+        currentQRId = nil
+        currentQRDetectionTime = nil
+        return (false, nil)
     }
     
-    /// Resume QR detection (called from app resume)
-    func resumeQRDetection() {
-        if navigationState.isNavigating && navigationState.qrDetectionActive {
-            qrDetector?.startScanning()
+//    private func startQRMonitoring() {
+//        qrMonitoringTask?.cancel()
+//        qrMonitoringTask = Task {
+//            while !Task.isCancelled && navigationState.isNavigating {
+//                // Check for new QR detections from the detector
+//                if let qrDetector = qrDetector,
+//                   let detectedId = qrDetector.getLastDetectedQRId() {
+//                    let isNewQR = detectedId != currentQRId
+//                    let isRapidChange = currentQRDetectionTime.map { Date().timeIntervalSince($0) < qrChangeDetectionWindow } ?? false
+//                    
+//                    if isNewQR || isRapidChange {
+//                        currentQRId = detectedId
+//                        currentQRDetectionTime = Date()
+//                        
+//                        await MainActor.run {
+//                            navigationState.currentQRId = detectedId
+//                            navigationState.lastQRDetectionTime = Date()
+//                            navigationState.qrDetectionCount += 1
+//                        }
+//                        
+//                        print("NavigationManager: QR detected: '\(detectedId)' (new=\(isNewQR))")
+//                    }
+//                }
+//                
+//                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+//            }
+//        }
+//    }
+//    
+    // MARK: - Position Updates
+    
+    private func sendFirstPositionUpdate() async {
+        guard let calibration = tempCalibrationData else { return }
+        
+        let request = UpdateRequest(
+            currentX: calibration.mapStartX,
+            currentY: calibration.mapStartY,
+            currentBearing: calibration.initialBearing ?? 0.0,
+            qrDetected: false,
+            qrCodeId: nil
+        )
+        
+        print("NavigationManager: First update at (\(calibration.mapStartX), \(calibration.mapStartY)), bearing: \(calibration.initialBearing ?? 0)")
+        
+        do {
+            let response = try await NavigationAPIService.shared.updatePosition(request: request)
+            print("NavigationManager: First response status: \(response.status)")
+            print("NavigationManager: First response message: \(response.message ?? "nil")")
+            print("NavigationManager: First response instructions: \(response.instructions ?? "nil")")
+            await handleNavigationResponse(response, isFirstUpdate: true)
+        } catch {
+            print("NavigationManager: First update error: \(error)")
         }
     }
     
-    /// Get comprehensive smart QR state information
-    func getSmartQRInfo() -> [String: Any] {
-        let qrState = qrDetector?.detectionState
-        let (smartDetected, smartId) = getSmartQRState()
-        
-        return [
-            "cameraDetected": qrState?.isDetected ?? false,
-            "cameraContent": qrState?.lastQRContent ?? "None",
-            "smartDetected": smartDetected,
-            "smartId": smartId ?? "None",
-            "currentQRId": currentQRId ?? "None",
-            "lastSentQRId": lastSentQRId ?? "None",
-            "qrDetectionCount": navigationState.qrDetectionCount,
-            "qrEngine": "VISION",
-            "qrSyncMode": navigationState.qrSyncMode
-        ]
-    }
-    
-    /// Cleanup resources
-    func cleanup() {
-        print("NavigationManager: Cleaning up")
-        updateTask?.cancel()
-        qrMonitoringTask?.cancel()
-        qrDetector?.cleanup()
-        resetQRSyncState()
-    }
-    
-    // MARK: - Private Methods
-    
-    private func startQRDetection() {
-        qrDetector?.startScanning()
-        navigationState.qrDetectionActive = true
-        navigationState.qrSyncMode = "SMART_SYNC"
-        
-        // Start QR monitoring task
-        startSmartQRMonitoring()
-        
-        print("NavigationManager: QR detection started")
-    }
-    
-    private func startPositionUpdates() {
+    private func startPositionUpdateLoop() {
         updateTask?.cancel()
         
         updateTask = Task {
@@ -359,7 +422,7 @@ class NavigationManager: ObservableObject {
             return
         }
         
-        // Check for new steps
+        // Check for new steps (matching Android: only send on step change)
         let currentSteps = sensorManager.imuState.stepCount
         guard currentSteps > lastStepCount else { return }
         
@@ -369,7 +432,7 @@ class NavigationManager: ObservableObject {
         let (qrDetected, qrId) = getSmartQRState()
         
         // Track sent QR
-        if qrDetected && qrId != nil {
+        if qrDetected, let qrId = qrId {
             lastSentQRId = qrId
             await MainActor.run {
                 navigationState.lastSentQRId = qrId
@@ -386,93 +449,184 @@ class NavigationManager: ObservableObject {
         
         do {
             let response = try await NavigationAPIService.shared.updatePosition(request: request)
-            await handleNavigationResponse(response)
+            retryCount = 0
+            
+            // Handle segment info BEFORE handling response (matching Android order)
+            if let segmentInfo = response.segmentInfo {
+                updateCurrentSegmentId(segmentInfo.segmentIndex)
+            }
+            
+            // Handle segment-based recalibration (MATCHING ANDROID exactly)
+            if response.status == "segment_change", let newPos = response.newMapPosition, newPos.count >= 2 {
+                await handleSegmentRecalibration(response: response, reason: "segment_change")
+            }
+            
+            if response.status == "segment_ending", let newPos = response.newMapPosition, newPos.count >= 2 {
+                await handleSegmentRecalibration(response: response, reason: "segment_ending")
+            }
+            
+            // Handle navigation instruction
+            await handleNavigationResponse(response, isFirstUpdate: false)
+            
         } catch {
-            print("NavigationManager: Update error: \(error)")
-        }
-    }
-    
-    private func handleNavigationResponse(_ response: NavigationResponse) async {
-        // Handle segment info
-        if let segmentInfo = response.segmentInfo {
-            updateCurrentSegmentId(segmentInfo.segmentIndex)
-        }
-        
-        // Handle recalibration
-        if let newPosition = response.newMapPosition, newPosition.count >= 2 {
-            await handleRecalibration(
-                newPosition: newPosition,
-                reason: response.deviationType ?? "position_update"
-            )
-        }
-        
-        // Handle instructions
-        if let instruction = response.instructions {
-            let translatedInstruction: String
-            if languageManager?.isFrench() == true {
-                translatedInstruction = await languageManager?.translateFromEnglish(instruction) ?? instruction
+            retryCount += 1
+            print("NavigationManager: Update error (attempt \(retryCount)): \(error)")
+            
+            if retryCount >= maxRetryAttempts {
+                await MainActor.run {
+                    navigationState.errorMessage = "Connection lost after \(retryCount) attempts"
+                }
+                ttsManager?.speakCritical("Connection lost")
+                retryCount = 0
+                try? await Task.sleep(nanoseconds: retryDelayMs * 2 * 1_000_000)
             } else {
-                translatedInstruction = instruction
+                try? await Task.sleep(nanoseconds: retryDelayMs * 1_000_000)
             }
-            
-            await MainActor.run {
-                navigationState.currentInstruction = translatedInstruction
-                navigationState.serverResponse = response.message
-                navigationState.lastUpdateTime = Date()
-            }
-            
-            // Announce instruction
-            handleInstructionAnnouncement(translatedInstruction)
         }
     }
     
-    private func handleInstructionAnnouncement(_ instruction: String) {
-        let lowerInstruction = instruction.lowercased().trimmingCharacters(in: .whitespaces)
+    // MARK: - Response Handling (MATCHING ANDROID LOGIC)
+    
+    private func handleNavigationResponse(_ response: NavigationResponse, isFirstUpdate: Bool) async {
+        // CRITICAL FIX: Match Android's instruction extraction order
+        // Android: val newInstruction = response.message ?: response.instructions
+        // The server puts the actual navigation instruction in 'message' for updates
+        let newInstruction = response.message ?? response.instructions
         
-        // Skip certain phrases
-        let skipPhrases = [
-            "continue moving",
-            "keep going",
-            "you're on track",
-            "on the right path"
-        ]
-        
-        if skipPhrases.contains(where: { lowerInstruction.contains($0) }) {
+        guard let instruction = newInstruction, !instruction.isEmpty else {
+            if response.status == "error" {
+                let errorMsg = "Server error: \(response.message ?? "Unknown")"
+                print("NavigationManager: \(errorMsg)")
+                await MainActor.run {
+                    navigationState.errorMessage = errorMsg
+                }
+                ttsManager?.speakCritical("Navigation error occurred")
+            }
             return
         }
         
-        // Use appropriate speech method based on instruction type
+        // Translate if needed
+        let translatedInstruction: String
+        if languageManager?.isFrench() == true {
+            translatedInstruction = await languageManager?.translateFromEnglish(instruction) ?? instruction
+        } else {
+            translatedInstruction = instruction
+        }
+        
+        // Update UI state
+        await MainActor.run {
+            navigationState.currentInstruction = translatedInstruction
+            navigationState.serverResponse = response.message
+            navigationState.lastUpdateTime = Date()
+            navigationState.errorMessage = nil
+        }
+        
+        // Handle instruction announcement (matching Android logic)
+        handleInstructionAnnouncement(translatedInstruction, isFirst: isFirstUpdate)
+        
+        // Check for destination arrival AFTER TTS (matching Android)
+        if instruction.contains("Arrived! Destination") || instruction.lowercased().contains("arrived") {
+            print("NavigationManager: 🎉 Destination reached!")
+            // Give TTS time to speak, then stop
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                self?.stopNavigation()
+            }
+        }
+    }
+    
+    // MARK: - Instruction Announcement (MATCHING ANDROID)
+    
+    private func handleInstructionAnnouncement(_ instruction: String, isFirst: Bool = false) {
+        let lowerInstruction = instruction.lowercased().trimmingCharacters(in: .whitespaces)
+        
+        // MATCHING ANDROID skip phrases exactly
+        let skipPhrases = [
+            "no value return",
+            "you are on track",
+            "pas de valeur de retour",
+            "aucune valeur de retour",
+            "valeur de retour",
+            "on track",
+            "vous êtes sur la bonne voie",
+            "sur la bonne voie",
+            "press start",
+            "update received",
+            "position updated"
+        ]
+        
+        if skipPhrases.contains(where: { lowerInstruction.contains($0) }) || instruction.trimmingCharacters(in: .whitespaces).isEmpty {
+            print("NavigationManager: Filtered skip phrase: '\(instruction)'")
+            return
+        }
+        
+        // Don't repeat same instruction
+        if instruction == lastInstructionText && !isFirst {
+            return
+        }
+        
+        lastInstructionText = instruction
+        
+        // Check timing
+        let timeSinceLast = Date().timeIntervalSince(lastInstructionTime)
+        guard isFirst || timeSinceLast >= minInstructionInterval else { return }
+        
+        lastInstructionTime = Date()
+        
+        print("NavigationManager: 🔊 Speaking: \"\(instruction)\"")
+        
+        // Use appropriate TTS priority (matching Android)
         if ttsManager?.isEmergencyCorrection(instruction) == true {
             ttsManager?.speakEmergencyCorrection(instruction)
+        } else if isFirst {
+            ttsManager?.speak(instruction, force: true)
         } else {
             ttsManager?.speak(instruction)
         }
     }
     
-    private func handleRecalibration(newPosition: [Double], reason: String) async {
-        guard newPosition.count >= 2 else { return }
+    // MARK: - Segment & Bearing Correction (MATCHING ANDROID)
+    
+    private func updateCurrentSegmentId(_ segmentId: Int) {
+        if segmentId != currentSegmentId {
+            currentSegmentId = segmentId
+            // Update sensor manager so next step uses correct bearing
+            sensorManager?.setBearingCorrectionData(pathBearings, segmentId)
+            print("NavigationManager: Segment updated to \(segmentId)")
+        }
+    }
+    
+    private func handleSegmentRecalibration(response: NavigationResponse, reason: String) async {
+        guard let newMapPosition = response.newMapPosition, newMapPosition.count >= 2 else {
+            print("NavigationManager: Invalid new_map_position for \(reason)")
+            return
+        }
         
-        let mapX = newPosition[0]
-        let mapY = newPosition[1]
+        let mapX = newMapPosition[0]
+        let mapY = newMapPosition[1]
         
-        // Determine bearing handling based on reason
+        // Determine bearing based on reason (matching Android logic)
         let mapBearing: Double?
         switch reason {
         case "segment_ending":
+            // Preserve current bearing for segment endings
             mapBearing = sensorManager?.getCurrentMapPosition()?.bearing
         case "segment_change":
+            // Use current bearing for segment changes too
             mapBearing = sensorManager?.getCurrentMapPosition()?.bearing
         default:
             mapBearing = sensorManager?.getCurrentMapPosition()?.bearing
         }
         
-        print("NavigationManager: Recalibrating - \(reason)")
+        print("NavigationManager: Recalibrating for \(reason) at (\(mapX), \(mapY))")
         
         // Reset IMU position
         sensorManager?.resetPosition()
-        try? await Task.sleep(nanoseconds: 100_000_000)
+        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
-        guard let resetPosition = sensorManager?.getCurrentPosition() else { return }
+        guard let resetPosition = sensorManager?.getCurrentPosition() else {
+            print("NavigationManager: Failed to get reset position for recalibration")
+            return
+        }
         
         let success = calibrationManager?.calibrateWithMapPosition(
             currentImuPosition: resetPosition,
@@ -483,147 +637,45 @@ class NavigationManager: ObservableObject {
         ) ?? false
         
         if success {
-            print("NavigationManager: Recalibration successful")
-        } else {
-            print("NavigationManager: Recalibration failed")
-        }
-    }
-    
-    private func startSmartQRMonitoring() {
-        qrMonitoringTask?.cancel()
-        
-        qrMonitoringTask = Task {
-            while !Task.isCancelled && navigationState.isNavigating {
-                await checkQRState()
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-            }
-        }
-    }
-    
-    private func checkQRState() async {
-        guard let qrState = qrDetector?.detectionState,
-              qrState.isDetected,
-              let content = qrState.lastQRContent,
-              let numericId = QRIdExtractor.extractQRCodeId(content) else {
-            return
-        }
-        
-        let isNewQR = numericId != currentQRId
-        
-        if isNewQR {
-            print("NavigationManager: QR Change - \(currentQRId ?? "none") → \(numericId)")
-            currentQRId = numericId
-            currentQRDetectionTime = Date()
+            let calibrationType = reason == "segment_ending" ? "position only, bearing preserved" : "position + bearing"
+            print("NavigationManager: ✓ \(reason) recalibration successful (\(calibrationType))")
             
             await MainActor.run {
-                navigationState.currentQRId = numericId
-                navigationState.lastQRDetectionTime = Date()
-                navigationState.qrDetectionCount += 1
+                navigationState.currentInstruction = "\(response.message ?? "Recalibrated") (Position recalibrated - \(reason))"
+                navigationState.lastUpdateTime = Date()
             }
         } else {
-            currentQRDetectionTime = Date()
-        }
-    }
-    
-    private func getSmartQRState() -> (Bool, String?) {
-        let currentTime = Date()
-        
-        // Check for immediate detection
-        if let qrState = qrDetector?.detectionState,
-           qrState.isDetected,
-           let content = qrState.lastQRContent,
-           let newQRId = QRIdExtractor.extractQRCodeId(content) {
-            
-            if newQRId != currentQRId {
-                print("NavigationManager: New QR - \(currentQRId ?? "none") → \(newQRId)")
-                currentQRId = newQRId
-                currentQRDetectionTime = currentTime
-                
-                DispatchQueue.main.async {
-                    self.navigationState.currentQRId = newQRId
-                    self.navigationState.lastQRDetectionTime = currentTime
-                    self.navigationState.qrDetectionCount += 1
-                }
-                
-                return (true, newQRId)
-            } else {
-                currentQRDetectionTime = currentTime
-                return (true, newQRId)
+            print("NavigationManager: ✗ \(reason) recalibration failed")
+            await MainActor.run {
+                navigationState.errorMessage = "\(reason) recalibration failed, continuing with current calibration"
             }
         }
-        
-        // Check persistent QR
-        if let qrId = currentQRId, let detectionTime = currentQRDetectionTime {
-            let timeSince = currentTime.timeIntervalSince(detectionTime)
-            if timeSince < qrPersistenceWindow {
-                return (true, qrId)
-            } else {
-                currentQRId = nil
-                currentQRDetectionTime = nil
-                DispatchQueue.main.async {
-                    self.navigationState.currentQRId = nil
-                }
-            }
-        }
-        
-        return (false, nil)
     }
     
-    private func resetQRSyncState() {
-        currentQRId = nil
-        currentQRDetectionTime = nil
-        lastSentQRId = nil
-        
-        navigationState.currentQRId = nil
-        navigationState.lastSentQRId = nil
-        navigationState.qrDetectionCount = 0
-        navigationState.lastQRDetectionTime = nil
-        
-        print("NavigationManager: QR sync state reset")
+    // MARK: - Cleanup
+    
+    func cleanup() {
+        updateTask?.cancel()
+        qrMonitoringTask?.cancel()
     }
     
-    private func storePathBearings(_ bearings: [Double]) {
-        pathBearings = bearings
-        sensorManager?.setBearingCorrectionData(bearings, currentSegmentId)
-        print("NavigationManager: Stored \(bearings.count) path bearings")
+    func testQRDetection() {
+        print("NavigationManager: Testing QR detection")
+        qrDetector?.testVisionCapabilities()
     }
     
-    private func updateCurrentSegmentId(_ segmentId: Int) {
-        guard segmentId != currentSegmentId else { return }
-        
-        currentSegmentId = segmentId
-        sensorManager?.setBearingCorrectionData(pathBearings, segmentId)
-        
-        navigationState.currentSegmentId = segmentId
-        
-        print("NavigationManager: Segment updated to \(segmentId)")
+    func getSmartQRInfo() -> [String: Any] {
+        return [
+            "mode": navigationState.qrSyncMode,
+            "currentQRId": currentQRId ?? "none",
+            "lastSentQRId": lastSentQRId ?? "none",
+            "persistenceWindow": qrPersistenceWindow
+        ]
     }
-}
-
-// MARK: - Errors
-
-enum NavigationError: LocalizedError {
-    case notInitialized
-    case noCalibrationData
-    case calibrationFailed
-    case sensorError
-    case serverError(String)
-    case noInstruction
     
-    var errorDescription: String? {
-        switch self {
-        case .notInitialized:
-            return "Navigation not initialized"
-        case .noCalibrationData:
-            return "No calibration data received"
-        case .calibrationFailed:
-            return "Calibration failed"
-        case .sensorError:
-            return "Sensor error"
-        case .serverError(let message):
-            return "Server error: \(message)"
-        case .noInstruction:
-            return "No instruction received"
+    func resumeQRDetection() {
+        if navigationState.isNavigating {
+            qrDetector?.startScanning()
         }
     }
 }

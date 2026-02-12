@@ -2,9 +2,6 @@
 //  QRCodeDetector.swift
 //  IndoorNavigationTACME
 //
-//  QR Code detection using iOS Vision framework
-//  FIXED: Added startScanning, stopScanning, resetDetection methods
-//
 
 import Foundation
 import AVFoundation

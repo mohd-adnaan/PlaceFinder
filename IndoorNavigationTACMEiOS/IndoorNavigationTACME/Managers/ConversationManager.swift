@@ -3,104 +3,64 @@
 //  IndoorNavigationTACME
 //
 
-
 import Foundation
 import Speech
 import AVFoundation
 import Combine
+import UIKit
 
-/// Manages AI conversation features for voice-based navigation queries
 class ConversationManager: ObservableObject {
     
-    // MARK: - Published State
-    
     @Published var conversationState = ConversationState()
-    
-    // MARK: - Private Properties
     
     private var ttsManager: TTSManager?
     private var languageManager: LanguageManager?
     
-    private let audioEngine = AVAudioEngine()
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
+    private let audioEngine = AVAudioEngine()
     
-    // Route context for navigation queries
-    private var routeData: String?
     private var sourceLocation: String?
     private var destinationLocation: String?
-    
-    // MARK: - Initialization
+    private var routeData: String?
+    private var conversationContext: [String] = []
+    private var feedbackGenerator: UIImpactFeedbackGenerator?
     
     init() {
-        setupSpeechRecognizer()
+        feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
         print("ConversationManager: Initialized")
     }
     
-    // MARK: - Configuration
-    
-    /// Configure with required dependencies
     func configure(ttsManager: TTSManager, languageManager: LanguageManager) {
         self.ttsManager = ttsManager
         self.languageManager = languageManager
-        
-        // Update speech recognizer locale based on language
-        updateSpeechRecognizerLocale()
-        
+        setupSpeechRecognizer()
         print("ConversationManager: Configured with dependencies")
     }
     
     // MARK: - Public Methods
     
-    /// Start conversation mode
     func startConversationMode() {
+        conversationState.isActive = true
+        let message = "Conversation mode activated. How can I help you navigate?"
+        conversationState.currentMessage = message
+        conversationState.errorMessage = nil
+        
+        ttsManager?.speakPriority(message)
         print("ConversationManager: Starting conversation mode")
         
-        conversationState = ConversationState(isActive: true)
-        
-        // Announce activation
-        let message = languageManager?.getString("Conversation mode activated. How can I help you navigate?") ??
-                     "Conversation mode activated. How can I help you navigate?"
-        ttsManager?.speakPriority(message)
-        
-        // Request speech authorization
-        requestSpeechAuthorization()
-    }
-    
-    /// Stop conversation mode
-    func stopConversationMode() {
-        print("ConversationManager: Stopping conversation mode")
-        
-        stopListening()
-        conversationState = ConversationState()
-        sourceLocation = nil
-        destinationLocation = nil
-        routeData = nil
-        
-        let message = languageManager?.getString("Conversation mode deactivated") ?? "Conversation mode deactivated"
-        ttsManager?.speak(message)
-    }
-    
-    /// Start listening for voice input
-    func startListening() {
-        guard conversationState.isActive else {
-            print("ConversationManager: Cannot listen - conversation not active")
-            return
-        }
-        
-        // Check authorization
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             DispatchQueue.main.async {
                 switch status {
                 case .authorized:
-                    self?.performStartListening()
+                    print("ConversationManager: Speech recognition authorized")
                 case .denied:
-                    self?.handleError("Speech recognition denied. Please enable it in Settings.")
+                    self?.conversationState.errorMessage = "Speech recognition denied"
                 case .restricted:
-                    self?.handleError("Speech recognition is restricted on this device.")
+                    self?.conversationState.errorMessage = "Speech recognition restricted"
                 case .notDetermined:
-                    self?.handleError("Speech recognition authorization not determined.")
+                    self?.conversationState.errorMessage = "Speech recognition not determined"
                 @unknown default:
                     break
                 }
@@ -108,13 +68,42 @@ class ConversationManager: ObservableObject {
         }
     }
     
-    /// Stop listening
+    func stopConversationMode() {
+        print("ConversationManager: Stopping conversation mode")
+        stopListening()
+        conversationState = ConversationState()
+        sourceLocation = nil
+        destinationLocation = nil
+        routeData = nil
+        conversationContext.removeAll()
+        ttsManager?.speakPriority("Conversation mode deactivated")
+    }
+    
+    func startListening() {
+        guard conversationState.isActive else {
+            print("ConversationManager: Cannot listen - not active")
+            return
+        }
+        
+        // FIX: Wait for TTS to finish - accessing audio while TTS speaks causes 0Hz format
+        if ttsManager?.ttsState.isSpeaking == true {
+            print("ConversationManager: TTS still speaking, delaying listen...")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.performStartListening()
+            }
+        } else {
+            performStartListening()
+        }
+    }
+    
     func stopListening() {
-        audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if audioEngine.isRunning {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+        }
         recognitionRequest?.endAudio()
-        recognitionTask?.cancel()
         recognitionRequest = nil
+        recognitionTask?.cancel()
         recognitionTask = nil
         
         DispatchQueue.main.async { [weak self] in
@@ -122,143 +111,159 @@ class ConversationManager: ObservableObject {
         }
     }
     
-    /// Process text input manually
     func processTextInput(_ text: String) {
-        guard !text.isEmpty else { return }
+        guard conversationState.isActive, !text.trimmingCharacters(in: .whitespaces).isEmpty else { return }
         
-        // Add to conversation history
+        print("ConversationManager: Processing: \(text)")
+        
+        // ChatMessage uses (content:isUser:) - NOT (role:content:timestamp:)
         let userMessage = ChatMessage(content: text, isUser: true)
         
         DispatchQueue.main.async { [weak self] in
             self?.conversationState.messages.append(userMessage)
-            self?.conversationState.currentMessage = text
             self?.conversationState.isProcessing = true
         }
+        
+        conversationContext.append("User: \(text)")
         
         Task {
             await processInput(text)
         }
     }
     
-    /// Set locations from navigation manager
-    func setLocations(source: String?, destination: String?) {
+    func setNavigationContext(source: String, destination: String) {
         sourceLocation = source
         destinationLocation = destination
     }
     
-    /// Set route data
     func setRouteData(_ data: String) {
         routeData = data
-        DispatchQueue.main.async { [weak self] in
-            self?.conversationState.hasRouteData = true
-        }
+        conversationState.hasRouteData = true
     }
     
-    // MARK: - Private Methods
+    // MARK: - Private: Speech Recognition
     
     private func setupSpeechRecognizer() {
-        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
-    }
-    
-    private func updateSpeechRecognizerLocale() {
         let locale = languageManager?.getCurrentLocale() ?? Locale(identifier: "en-US")
         speechRecognizer = SFSpeechRecognizer(locale: locale)
-    }
-    
-    private func requestSpeechAuthorization() {
-        SFSpeechRecognizer.requestAuthorization { [weak self] status in
-            DispatchQueue.main.async {
-                switch status {
-                case .authorized:
-                    print("ConversationManager: Speech recognition authorized")
-                case .denied, .restricted, .notDetermined:
-                    self?.handleError("Speech recognition not available. You can still type messages.")
-                @unknown default:
-                    break
-                }
-            }
+        
+        guard speechRecognizer?.isAvailable == true else {
+            print("ConversationManager: Speech recognizer not available")
+            return
         }
+        print("ConversationManager: Speech recognizer ready for \(locale.identifier)")
     }
     
     private func performStartListening() {
-        // Stop any existing recognition
-        stopListening()
+        recognitionTask?.cancel()
+        recognitionTask = nil
         
-        // Configure audio session
+        if audioEngine.isRunning {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
+        }
+        
+        // Configure audio session BEFORE reading input format
         let audioSession = AVAudioSession.sharedInstance()
         do {
-            try audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try audioSession.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
-            handleError("Could not configure audio session: \(error.localizedDescription)")
+            print("ConversationManager: Audio session error: \(error)")
+            DispatchQueue.main.async { [weak self] in
+                self?.conversationState.errorMessage = "Microphone setup failed"
+            }
             return
         }
         
-        // Create recognition request
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
-        guard let recognitionRequest = recognitionRequest else {
-            handleError("Could not create recognition request")
+        guard let recognitionRequest = recognitionRequest,
+              let speechRecognizer = speechRecognizer else {
+            print("ConversationManager: Recognizer not available")
             return
         }
         
         recognitionRequest.shouldReportPartialResults = true
-        recognitionRequest.requiresOnDeviceRecognition = false
+        if #available(iOS 13, *) {
+            recognitionRequest.requiresOnDeviceRecognition = false
+        }
         
-        // Start recognition task
-        recognitionTask = speechRecognizer?.recognitionTask(with: recognitionRequest) { [weak self] result, error in
-            guard let self = self else { return }
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            var isFinal = false
             
             if let result = result {
-                let transcription = result.bestTranscription.formattedString
+                let text = result.bestTranscription.formattedString
+                isFinal = result.isFinal
                 
                 DispatchQueue.main.async {
-                    self.conversationState.currentSpeechText = transcription
+                    self?.conversationState.currentSpeechText = text
                 }
                 
-                if result.isFinal {
-                    self.stopListening()
-                    self.processTextInput(transcription)
+                if isFinal {
+                    DispatchQueue.main.async {
+                        self?.stopListening()
+                        self?.processTextInput(text)
+                    }
                 }
             }
             
-            if let error = error {
-                print("ConversationManager: Recognition error: \(error)")
-                self.stopListening()
+            if error != nil || isFinal {
+                self?.audioEngine.stop()
+                self?.audioEngine.inputNode.removeTap(onBus: 0)
+                self?.recognitionRequest = nil
+                self?.recognitionTask = nil
+                DispatchQueue.main.async {
+                    self?.conversationState.isListening = false
+                }
             }
         }
         
-        // Configure audio input
+        // CRITICAL FIX: Validate format before installTap
         let inputNode = audioEngine.inputNode
         let recordingFormat = inputNode.outputFormat(forBus: 0)
         
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
-            self.recognitionRequest?.append(buffer)
+        guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
+            print("ConversationManager: ⚠️ Invalid audio format: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount)ch")
+            print("  TTS likely still holding audio session. Retrying in 1s...")
+            
+            recognitionRequest.endAudio()
+            self.recognitionRequest = nil
+            recognitionTask?.cancel()
+            self.recognitionTask = nil
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.performStartListening()
+            }
+            return
         }
         
-        // Start audio engine
+        print("ConversationManager: Audio format OK: \(recordingFormat.sampleRate)Hz, \(recordingFormat.channelCount)ch")
+        
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { [weak self] buffer, _ in
+            self?.recognitionRequest?.append(buffer)
+        }
+        
         audioEngine.prepare()
         
         do {
             try audioEngine.start()
-            
             DispatchQueue.main.async { [weak self] in
                 self?.conversationState.isListening = true
             }
-            
             playFeedbackBeep(type: "start")
-            
-            // Announce listening
-            let message = languageManager?.getString("Listening") ?? "Listening"
-            ttsManager?.speakPriority(message)
-            
-            print("ConversationManager: Started listening")
+            print("ConversationManager: Listening started")
         } catch {
-            handleError("Could not start audio engine: \(error.localizedDescription)")
+            print("ConversationManager: Audio engine start failed: \(error)")
+            DispatchQueue.main.async { [weak self] in
+                self?.conversationState.errorMessage = "Failed to start listening"
+                self?.conversationState.isListening = false
+            }
         }
     }
     
+    // MARK: - Private: AI Processing
+    
     private func processInput(_ text: String) async {
-        // Translate to English if needed
         let englishInput: String
         if languageManager?.isFrench() == true {
             englishInput = await languageManager?.translateToEnglish(text) ?? text
@@ -266,47 +271,95 @@ class ConversationManager: ObservableObject {
             englishInput = text
         }
         
-        // Get GPT response
-        let gptResponse = await askGemini(englishInput)
-        await handleGeminiResponse(gptResponse)
-    }
-    
-    /// Send request to Gemini API using the EXISTING GeminiService.shared
-    private func askGemini(_ input: String) async -> String {
-        let systemPrompt = buildConversationSystemPrompt()
-        
         do {
-            // Use EXISTING GeminiService.shared.sendPrompt method
-            let response = try await GeminiService.shared.sendPrompt(
-                input,
-                systemPrompt: systemPrompt
-            )
-            return response
-        } catch {
-            print("ConversationManager: Gemini request failed: \(error)")
+            let locationIntent = await extractLocationsWithGPT(englishInput)
             
-            // Provide helpful error messages
-            if let geminiError = error as? GeminiError {
-                switch geminiError {
-                case .missingAPIKey:
-                    return "AI features require an API key. Please add your Gemini API key in the app settings."
-                case .invalidURL:
-                    return "There was a configuration error. Please try again."
-                case .invalidResponse, .decodingError:
-                    return "I received an unexpected response. Please try again."
-                case .httpError(let code):
-                    return "Server error (\(code)). Please try again later."
-                case .apiError(let message):
-                    return "AI service error: \(message)"
+            if locationIntent.isNewRouteRequest {
+                if let source = locationIntent.source { sourceLocation = source }
+                if let destination = locationIntent.destination { destinationLocation = destination }
+                
+                if sourceLocation != nil && destinationLocation != nil {
+                    let response = "Starting navigation from \(sourceLocation!) to \(destinationLocation!)."
+                    await handleGPTResponse(response)
+                    return
                 }
             }
             
-            return "I'm having trouble connecting to the AI service. Please check your network connection and try again."
+            if locationIntent.needsClarification {
+                let msg: String
+                if sourceLocation == nil {
+                    msg = "Where are you starting from?"
+                } else if destinationLocation == nil {
+                    msg = "Where would you like to go?"
+                } else {
+                    msg = "Could you please provide more details?"
+                }
+                await handleGPTResponse(locationIntent.clarificationMessage ?? msg)
+                return
+            }
+            
+            if conversationState.hasRouteData && locationIntent.isQuestionAboutRoute {
+                await processWithGPT(englishInput)
+                return
+            }
+            
+            await processWithGPT(englishInput)
+            
+        } catch {
+            await MainActor.run {
+                conversationState.isProcessing = false
+                conversationState.errorMessage = "Error: \(error.localizedDescription)"
+            }
         }
     }
     
-    private func handleGeminiResponse(_ response: String) async {
-        // Translate if needed
+    private func extractLocationsWithGPT(_ userInput: String) async -> LocationIntent {
+        let systemPrompt = """
+        You are a navigation assistant. Analyze user input and extract navigation info.
+        
+        Context:
+        - Known source: \(sourceLocation ?? "none")
+        - Known destination: \(destinationLocation ?? "none")
+        
+        Location normalization: remove spaces, lowercase. "female restroom" → "femalerestroom"
+        
+        Respond with ONLY JSON:
+        {"is_new_route_request":false,"is_question_about_route":false,"needs_clarification":false,"source":null,"destination":null,"clarification_message":null}
+        """
+        
+        do {
+            let response = try await GeminiService.shared.sendPrompt(
+                "User says: \"\(userInput)\"\n\nExtract navigation intent.",
+                systemPrompt: systemPrompt
+            )
+            return parseLocationIntent(response)
+        } catch {
+            print("ConversationManager: Location extraction error: \(error)")
+            return LocationIntent()
+        }
+    }
+    
+    private func processWithGPT(_ input: String) async {
+        var systemPrompt = "You are a helpful indoor navigation assistant. Keep responses brief (under 50 words)."
+        if let source = sourceLocation, let dest = destinationLocation {
+            systemPrompt += "\nCurrent route: \(source) → \(dest)"
+        }
+        if let routeData = routeData {
+            systemPrompt += "\nRoute data: \(routeData)"
+        }
+        
+        do {
+            let response = try await GeminiService.shared.sendPrompt(input, systemPrompt: systemPrompt)
+            await handleGPTResponse(response)
+        } catch {
+            await MainActor.run {
+                conversationState.isProcessing = false
+                conversationState.errorMessage = "AI error: \(error.localizedDescription)"
+            }
+        }
+    }
+    
+    private func handleGPTResponse(_ response: String) async {
         let translatedResponse: String
         if languageManager?.isFrench() == true {
             translatedResponse = await languageManager?.translateFromEnglish(response) ?? response
@@ -314,55 +367,55 @@ class ConversationManager: ObservableObject {
             translatedResponse = response
         }
         
+        // ChatMessage uses (content:isUser:) - timestamp has default value
+        let assistantMessage = ChatMessage(content: translatedResponse, isUser: false)
+        conversationContext.append("Assistant: \(response)")
+        
         await MainActor.run {
-            // Add to history
-            let assistantMessage = ChatMessage(content: translatedResponse, isUser: false)
             conversationState.messages.append(assistantMessage)
             conversationState.gptResponse = translatedResponse
             conversationState.isProcessing = false
         }
         
-        // Speak response
-        ttsManager?.speakPriority(translatedResponse)
-        playFeedbackBeep(type: "end")
+        ttsManager?.speak(translatedResponse, force: true)
     }
     
-    private func handleError(_ message: String) {
-        print("ConversationManager: Error - \(message)")
+    private func parseLocationIntent(_ response: String) -> LocationIntent {
+        let cleaned = response
+            .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         
-        DispatchQueue.main.async { [weak self] in
-            self?.conversationState.errorMessage = message
-            self?.conversationState.isProcessing = false
-            self?.conversationState.isListening = false
+        guard let data = cleaned.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            print("ConversationManager: Failed to parse intent JSON")
+            return LocationIntent()
         }
         
-        ttsManager?.speak(message)
+        return LocationIntent(
+            isNewRouteRequest: json["is_new_route_request"] as? Bool ?? false,
+            isQuestionAboutRoute: json["is_question_about_route"] as? Bool ?? false,
+            needsClarification: json["needs_clarification"] as? Bool ?? false,
+            source: json["source"] as? String,
+            destination: json["destination"] as? String,
+            clarificationMessage: json["clarification_message"] as? String
+        )
     }
     
-    private func buildConversationSystemPrompt() -> String {
-        var prompt = """
-        You are a helpful indoor navigation assistant.
-        Keep responses concise and focused on navigation.
-        Respond in 1-2 sentences maximum for simple queries.
-        """
-        
-        if let route = routeData {
-            prompt += "\n\nCurrent route information:\n\(route)"
-        }
-        
-        if let source = sourceLocation {
-            prompt += "\nUser is starting from: \(source)"
-        }
-        
-        if let destination = destinationLocation {
-            prompt += "\nUser is going to: \(destination)"
-        }
-        
-        return prompt
-    }
+    // MARK: - Audio Feedback
     
     private func playFeedbackBeep(type: String) {
-        let systemSoundID: SystemSoundID = type == "start" ? 1113 : 1114
-        AudioServicesPlaySystemSound(systemSoundID)
+        feedbackGenerator?.impactOccurred()
+        switch type {
+        case "start": AudioServicesPlaySystemSound(1113)
+        case "end": AudioServicesPlaySystemSound(1114)
+        case "error": AudioServicesPlaySystemSound(1053)
+        default: break
+        }
+    }
+    
+    func cleanup() {
+        stopListening()
+        conversationContext.removeAll()
     }
 }

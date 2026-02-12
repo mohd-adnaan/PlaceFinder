@@ -350,35 +350,40 @@ class NavigationManager: ObservableObject {
         return (false, nil)
     }
     
-//    private func startQRMonitoring() {
-//        qrMonitoringTask?.cancel()
-//        qrMonitoringTask = Task {
-//            while !Task.isCancelled && navigationState.isNavigating {
-//                // Check for new QR detections from the detector
-//                if let qrDetector = qrDetector,
-//                   let detectedId = qrDetector.getLastDetectedQRId() {
-//                    let isNewQR = detectedId != currentQRId
-//                    let isRapidChange = currentQRDetectionTime.map { Date().timeIntervalSince($0) < qrChangeDetectionWindow } ?? false
-//                    
-//                    if isNewQR || isRapidChange {
-//                        currentQRId = detectedId
-//                        currentQRDetectionTime = Date()
-//                        
-//                        await MainActor.run {
-//                            navigationState.currentQRId = detectedId
-//                            navigationState.lastQRDetectionTime = Date()
-//                            navigationState.qrDetectionCount += 1
-//                        }
-//                        
-//                        print("NavigationManager: QR detected: '\(detectedId)' (new=\(isNewQR))")
-//                    }
-//                }
-//                
-//                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
-//            }
-//        }
-//    }
-//    
+    private func startQRMonitoring() {
+        qrMonitoringTask?.cancel()
+        qrMonitoringTask = Task {
+            while !Task.isCancelled && navigationState.isNavigating {
+                // Read QR state from the detector's published detectionState
+                if let qrDetector = qrDetector,
+                   qrDetector.detectionState.isDetected,
+                   let rawContent = qrDetector.detectionState.detectedContent {
+                    
+                    // Extract the QR ID from raw content (e.g. "QR_Id:https://qrco.de/bgErvr" → "bgErvr")
+                    let detectedId = QRIdExtractor.extractQRCodeId(rawContent) ?? rawContent
+                    
+                    let isNewQR = detectedId != currentQRId
+                    let isRapidChange = currentQRDetectionTime.map { Date().timeIntervalSince($0) < qrChangeDetectionWindow } ?? false
+                    
+                    if isNewQR || isRapidChange {
+                        currentQRId = detectedId
+                        currentQRDetectionTime = Date()
+                        
+                        await MainActor.run {
+                            navigationState.currentQRId = detectedId
+                            navigationState.lastQRDetectionTime = Date()
+                            navigationState.qrDetectionCount += 1
+                        }
+                        
+                        print("NavigationManager: QR detected: '\(detectedId)' (new=\(isNewQR))")
+                    }
+                }
+                
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+            }
+        }
+    }
+    
     // MARK: - Position Updates
     
     private func sendFirstPositionUpdate() async {

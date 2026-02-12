@@ -2,65 +2,55 @@
 //  NavigationAPIService.swift
 //  IndoorNavigationTACME
 //
-//  Network service for navigation API communication
-//
 
 import Foundation
 
-/// Service for communicating with the navigation backend
 actor NavigationAPIService {
-    
-    // MARK: - Properties
     
     private let baseURL: URL
     private let session: URLSession
     private var sessionId: String
     
-    // MARK: - Singleton
-    
     static let shared = NavigationAPIService()
     
-    // MARK: - Initialization
-    
     private init() {
-        // Configure base URL - production server
-        self.baseURL = URL(string: "https://indoornavigationtacme-production.up.railway.app")!
+        // FIXED: Point to actual backend server
+        self.baseURL = URL(string: "http://132.206.70.209:5000")!
         self.sessionId = "ios_session_\(Int(Date().timeIntervalSince1970 * 1000))"
         
-        // Configure URLSession with timeout settings
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30
         configuration.timeoutIntervalForResource = 60
         configuration.waitsForConnectivity = true
-        
         self.session = URLSession(configuration: configuration)
     }
     
-    // MARK: - Public Methods
-    
-    /// Initialize navigation session with source and destination
     func initialize(request: InitializeRequest) async throws -> NavigationResponse {
-        let endpoint = baseURL.appendingPathComponent("wayfinder")
-        return try await performRequest(endpoint: endpoint, body: request)
+        return try await performRequest(path: "wayfinder", body: request)
     }
     
-    /// Update current position and get navigation instructions
     func updatePosition(request: UpdateRequest) async throws -> NavigationResponse {
-        let endpoint = baseURL.appendingPathComponent("wayfinder")
-        return try await performRequest(endpoint: endpoint, body: request)
+        return try await performRequest(path: "wayfinder", body: request)
     }
     
-    /// Reset session ID for new navigation
     func resetSession() {
         sessionId = "ios_session_\(Int(Date().timeIntervalSince1970 * 1000))"
     }
     
-    // MARK: - Private Methods
-    
-    private func performRequest<T: Encodable>(endpoint: URL, body: T) async throws -> NavigationResponse {
-        var request = URLRequest(url: endpoint)
+    private func performRequest<T: Encodable>(path: String, body: T) async throws -> NavigationResponse {
+        // Build URL with session_id as query parameter (matching API docs)
+        var components = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        components.queryItems = [URLQueryItem(name: "session_id", value: sessionId)]
+        
+        guard let url = components.url else {
+            throw NavigationAPIError.invalidResponse
+        }
+        
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // Also send as header for Android compatibility
         request.setValue(sessionId, forHTTPHeaderField: "Session-ID")
         
         let encoder = JSONEncoder()
@@ -68,7 +58,8 @@ actor NavigationAPIService {
         
         #if DEBUG
         if let bodyData = request.httpBody, let bodyString = String(data: bodyData, encoding: .utf8) {
-            print("NavigationAPI Request: \(bodyString)")
+            print("NavigationAPI POST \(url)")
+            print("NavigationAPI Body: \(bodyString)")
         }
         #endif
         
@@ -80,7 +71,9 @@ actor NavigationAPIService {
         
         #if DEBUG
         if let responseString = String(data: data, encoding: .utf8) {
-            print("NavigationAPI Response (\(httpResponse.statusCode)): \(responseString)")
+            // Truncate long responses for readability
+            let truncated = responseString.count > 500 ? String(responseString.prefix(500)) + "..." : responseString
+            print("NavigationAPI Response (\(httpResponse.statusCode)): \(truncated)")
         }
         #endif
         
@@ -93,12 +86,14 @@ actor NavigationAPIService {
             return try decoder.decode(NavigationResponse.self, from: data)
         } catch {
             print("NavigationAPI Decode Error: \(error)")
+            // Print the raw response to help debug
+            if let raw = String(data: data, encoding: .utf8) {
+                print("NavigationAPI Raw: \(raw)")
+            }
             throw NavigationAPIError.decodingError(error)
         }
     }
 }
-
-// MARK: - Errors
 
 enum NavigationAPIError: LocalizedError {
     case invalidResponse

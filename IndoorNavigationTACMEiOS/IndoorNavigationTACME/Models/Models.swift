@@ -200,6 +200,29 @@ struct IMUState {
     }
 }
 
+// MARK: - Acceleration Sample
+
+struct AccelerationSample {
+    let timestamp: Date
+    let x: Double
+    let y: Double
+    let z: Double
+    let magnitude: Double
+    let filtered: Double
+}
+
+// MARK: - Bearing Result
+
+struct BearingResult {
+    let bearing: Double
+    let wasCorrected: Bool
+    
+    init(_ bearing: Double, _ wasCorrected: Bool) {
+        self.bearing = bearing
+        self.wasCorrected = wasCorrected
+    }
+}
+
 // MARK: - Navigation State
 
 /// State of the navigation system

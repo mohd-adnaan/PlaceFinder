@@ -2,388 +2,469 @@
 //  IMUSensorManager.swift
 //  IndoorNavigationTACME
 //
-//  Core IMU sensor processing - CoreMotion implementation
-//  FIXED: All compilation errors resolved
 //
 
 import Foundation
 import CoreMotion
 import Combine
 
-/// Manager for IMU sensor processing and step detection
 class IMUSensorManager: ObservableObject {
     
-    // MARK: - Published State
-    
+    // MARK: - Published Properties
     @Published var imuState = IMUState()
     
     // MARK: - Private Properties
-    
     private let motionManager = CMMotionManager()
     private var calibrationManager: IMUCalibrationManager?
+    private let stepFactorCalibration = UserStepFactorCalibration()
     
-    // Step detection
-    private var stepCount: Int = 0
-    private var lastStepTime: Date?
-    private var currentStepLength: Double = 0.65
-    private var recentStepPeriods: [TimeInterval] = []
-    
-    // Acceleration processing
-    private var filteredAcceleration: [Double] = []
-    private var accelerationVariances: [Double] = []
-    private var detectedPeaks: [Double] = []
-    private var filterBuffer: [Double] = []
-    private var lastPeak: Double = 0
-    private var lastValley: Double = 0
-    private var peakConfirmed = false
-    private var valleyConfirmed = false
-    private let filterOrder = 4
-    private let filterWindowSize = 10
+    // Sensor update interval
+    private let sensorUpdateInterval: TimeInterval = 0.02 // 50Hz
     
     // Position tracking
-    private var currentPosition = Position()
+    private var currentX: Double = 0
+    private var currentY: Double = 0
     private var currentBearing: Double = 0
+    private var stepCount: Int = 0
+    private var currentStepLength: Double = 0.65
     
-    // Step factor calibration
-    private let stepFactorCalibration = UserStepFactorCalibration()
+    // Gyroscope integration
+    private var gyroIntegrationBearing: Double = 0
+    private var initialBearingSet: Bool = false
+    private var lastTimestamp: TimeInterval = 0
+    
+    // Step detection - MATCHING ANDROID
+    private var filteredAcceleration: [Double] = []
+    private var accelerationTimestamps: [TimeInterval] = []
+    private var accelerationVariances: [Double] = []
+    private var detectedPeaks: [Double] = []
+    private var recentStepPeriods: [TimeInterval] = []
+    private var lastStepTime: Date?
+    
+    // Peak-valley detection (MATCHING ANDROID)
+    private var lastFilteredMagnitude: Double = 0
+    private var lastPeak: Double = 0
+    private var lastValley: Double = 0
+    private var lastPeakTime: TimeInterval = 0
+    private let stepPeakThreshold: Double = 0.15
+    
+    // Real Butterworth bandpass filter (SAME COEFFICIENTS AS ANDROID)
+    private let butterworthFilter = ButterworthBandpassFilter()
+    
+    // Filter parameters
+    private let dynamicWindowSize = 50
+    private let varianceThreshold: Double = 0.005
     
     // Bearing correction
     private var pathBearings: [Double] = []
     private var currentSegmentId: Int = -1
+    private var bearingCorrectionCount: Int = 0
+    private let bearingCorrectionThreshold: Double = 25.0
     
     // Constants
-    private let updateInterval: TimeInterval = 0.02 // 50Hz
-    private let stepThreshold: Double = 0.15
-    private let minStepInterval: TimeInterval = 0.25
-    private let maxStepInterval: TimeInterval = 2.0
+    private let gyroNoiseThreshold: Double = 0.01
+    private let maxGyroRate: Double = 5.0
+    private let defaultBeta: Double = 0.6
+    
+    // Step timing constraints
+    private let minStepPeriod: TimeInterval = 0.3
+    private let maxStepPeriod: TimeInterval = 1.2
+    
+    // Acceleration logging
+    private var accelerationLogger = AccelerationLogger()
+    
+    // Debug
+    private var totalSamples: Int = 0
+    private var lastDebugLog: Date = Date.distantPast
     
     // MARK: - Initialization
-    
     init() {
+        setupMotionManager()
         print("IMUSensorManager: Initialized")
     }
     
-    // MARK: - Configuration
-    
-    /// Set calibration manager reference
-    func setCalibrationManager(_ manager: IMUCalibrationManager) {
-        self.calibrationManager = manager
-        print("IMUSensorManager: Calibration manager set")
+    deinit {
+        stopSensors()
     }
     
     // MARK: - Public Methods
     
-    /// Start sensor updates
+    func setCalibrationManager(_ manager: IMUCalibrationManager) {
+        self.calibrationManager = manager
+    }
+    
     func startSensors() {
         guard motionManager.isDeviceMotionAvailable else {
             print("IMUSensorManager: Device motion not available")
             return
         }
         
-        motionManager.deviceMotionUpdateInterval = updateInterval
-        motionManager.startDeviceMotionUpdates(
-            using: .xArbitraryZVertical,
-            to: .main
-        ) { [weak self] motion, error in
+        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] motion, error in
             guard let self = self, let motion = motion else {
                 if let error = error {
-                    print("IMUSensorManager: Motion update error: \(error)")
+                    print("IMUSensorManager: Motion error: \(error)")
                 }
                 return
             }
             self.processMotionUpdate(motion)
         }
         
-        print("IMUSensorManager: Started updates at \(1/updateInterval)Hz")
+        print("IMUSensorManager: Started updates at \(1.0/sensorUpdateInterval)Hz")
     }
     
-    /// Stop sensor updates
     func stopSensors() {
         motionManager.stopDeviceMotionUpdates()
-        print("IMUSensorManager: Stopped updates")
+        print("IMUSensorManager: Sensors stopped")
     }
     
-    /// Get current position transformed to map coordinates
+    func resetPosition() {
+        currentX = 0
+        currentY = 0
+        stepCount = 0
+        filteredAcceleration.removeAll()
+        accelerationTimestamps.removeAll()
+        accelerationVariances.removeAll()
+        detectedPeaks.removeAll()
+        recentStepPeriods.removeAll()
+        lastStepTime = nil
+        lastFilteredMagnitude = 0
+        lastPeak = 0
+        lastValley = 0
+        lastPeakTime = 0
+        butterworthFilter.reset()
+        accelerationLogger.clear()
+        totalSamples = 0
+        updateIMUState()
+        print("IMUSensorManager: Position reset")
+    }
+    
+    func setInitialBearing(_ bearing: Double) {
+        gyroIntegrationBearing = bearing
+        currentBearing = bearing
+        initialBearingSet = true
+        print("IMUSensorManager: Initial bearing set to \(bearing)°")
+    }
+    
+    func getCurrentPosition() -> Position {
+        return Position(x: currentX, y: currentY, bearing: currentBearing)
+    }
+    
     func getCurrentMapPosition() -> Position? {
         return calibrationManager?.transformToMapPosition(getCurrentPosition())
     }
     
-    /// Reset position to origin
-    func resetPosition() {
-        stepCount = 0
-        currentPosition = Position()
-        currentBearing = 0
-        filteredAcceleration.removeAll()
-        accelerationVariances.removeAll()
-        detectedPeaks.removeAll()
-        filterBuffer.removeAll()
-        lastPeak = 0
-        lastValley = 0
-        peakConfirmed = false
-        valleyConfirmed = false
-        recentStepPeriods.removeAll()
-        
-        updateState()
-        print("IMUSensorManager: Position reset")
-    }
-    
-    /// Get current position
-    func getCurrentPosition() -> Position {
-        return currentPosition
-    }
-    
-    /// Set initial bearing from calibration
-    func setInitialBearing(_ bearing: Double) {
-        currentBearing = bearing
-        currentPosition = Position(x: currentPosition.x, y: currentPosition.y, bearing: bearing)
-        print("IMUSensorManager: Initial bearing set to \(bearing)°")
-    }
-    
-    /// Set bearing correction data from server
     func setBearingCorrectionData(_ bearings: [Double], _ segmentId: Int) {
         pathBearings = bearings
         currentSegmentId = segmentId
         print("IMUSensorManager: Bearing correction data set - \(bearings.count) bearings, segment \(segmentId)")
     }
     
-    // MARK: - Step Calibration
-    
-    /// Start step length calibration
     func startStepCalibration() {
         stepFactorCalibration.startCalibration()
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.imuState.isCalibrating = true
-            self.imuState.calibrationStepCount = 0
-        }
-        print("IMUSensorManager: Step calibration started")
+        imuState.isCalibrating = true
     }
     
-    /// Complete step calibration
     func completeStepCalibration() {
         stepFactorCalibration.completeCalibration()
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.imuState.beta = self.stepFactorCalibration.getUserBeta()
-            self.imuState.isStepCalibrationValid = self.stepFactorCalibration.isCalibrationValid()
-            self.imuState.isCalibrating = false
-        }
-        print("IMUSensorManager: Step calibration completed - beta: \(stepFactorCalibration.getUserBeta())")
+        imuState.beta = stepFactorCalibration.getUserBeta()
+        imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
+        imuState.isCalibrating = false
     }
     
-    /// Stop step calibration
     func stopStepCalibration() {
         let _ = stepFactorCalibration.stopCalibration()
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.imuState.beta = self.stepFactorCalibration.getUserBeta()
-            self.imuState.isStepCalibrationValid = self.stepFactorCalibration.isCalibrationValid()
-            self.imuState.isCalibrating = false
-        }
-        print("IMUSensorManager: Step calibration stopped")
+        imuState.beta = stepFactorCalibration.getUserBeta()
+        imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
+        imuState.isCalibrating = false
     }
     
-    /// Cancel step calibration
-    func cancelStepCalibration() {
-        stepFactorCalibration.cancel()
-        
-        DispatchQueue.main.async { [weak self] in
-            self?.imuState.isCalibrating = false
-        }
-    }
-    
-    // MARK: - Debug Methods
-    
-    /// Get step detection metrics
     func getStepDetectionMetrics() -> [String: Any] {
         return [
             "totalSteps": stepCount,
             "averageStepLength": String(format: "%.2f", currentStepLength),
             "recentStepPeriods": recentStepPeriods.suffix(5),
-            "currentBearing": String(format: "%.1f", currentBearing),
-            "filterQuality": getFilterQuality()
+            "dynamicWindowSize": dynamicWindowSize,
+            "filterStatus": "Butterworth 0.8-4Hz",
+            "totalSamples": totalSamples,
+            "lastPeak": String(format: "%.4f", lastPeak),
+            "lastValley": String(format: "%.4f", lastValley)
         ]
     }
     
-    /// Clear accumulated sensor data
-    func clearAccumulatedData() {
-        filteredAcceleration.removeAll()
-        accelerationVariances.removeAll()
-        detectedPeaks.removeAll()
-        recentStepPeriods.removeAll()
-        filterBuffer.removeAll()
-        print("IMUSensorManager: Accumulated data cleared")
+    func getBearingCorrectionStats() -> [String: Any] {
+        return [
+            "pathBearingsCount": pathBearings.count,
+            "currentSegmentId": currentSegmentId,
+            "bearingCorrectionCount": bearingCorrectionCount,
+            "bearingThreshold": bearingCorrectionThreshold,
+            "currentBearing": String(format: "%.1f°", currentBearing)
+        ]
+    }
+    
+    func getAccelerationSamples() -> [AccelerationSample] {
+        return accelerationLogger.getSamples()
     }
     
     // MARK: - Private Methods
     
+    private func setupMotionManager() {
+        motionManager.deviceMotionUpdateInterval = sensorUpdateInterval
+    }
+    
     private func processMotionUpdate(_ motion: CMDeviceMotion) {
-        // Get vertical acceleration
-        let gravity = motion.gravity
-        let userAccel = motion.userAcceleration
+        let timestamp = motion.timestamp
+        processAccelerometer(motion.userAcceleration, timestamp: timestamp)
+        processGyroscope(motion.rotationRate, timestamp: timestamp)
+        updateIMUState()
+    }
+    
+    private func processAccelerometer(_ acceleration: CMAcceleration, timestamp: TimeInterval) {
+        // iOS userAcceleration already has gravity removed (values ~0 to ~3)
+        let magnitude = sqrt(acceleration.x * acceleration.x +
+                            acceleration.y * acceleration.y +
+                            acceleration.z * acceleration.z)
         
-        // Project user acceleration onto vertical axis
-        let verticalAccel = userAccel.x * gravity.x + userAccel.y * gravity.y + userAccel.z * gravity.z
+        totalSamples += 1
         
-        // Apply low-pass filter (Butterworth approximation)
-        filteredAcceleration.append(verticalAccel)
-        if filteredAcceleration.count > filterWindowSize {
+        // Apply REAL Butterworth bandpass filter (0.8-4Hz)
+        let filtered = butterworthFilter.filter(magnitude)
+        
+        // Log sample
+        accelerationLogger.addSample(AccelerationSample(
+            timestamp: Date(),
+            x: acceleration.x,
+            y: acceleration.y,
+            z: acceleration.z,
+            magnitude: magnitude,
+            filtered: filtered
+        ))
+        
+        accelerationTimestamps.append(timestamp)
+        filteredAcceleration.append(filtered)
+        
+        // Maintain window
+        if filteredAcceleration.count > dynamicWindowSize {
             filteredAcceleration.removeFirst()
+            accelerationTimestamps.removeFirst()
         }
         
-        let filteredValue = applyLowPassFilter()
+        // Calculate variance
+        if filteredAcceleration.count >= dynamicWindowSize {
+            let variance = calculateVariance(Array(filteredAcceleration))
+            accelerationVariances.append(variance)
+            if accelerationVariances.count > dynamicWindowSize {
+                accelerationVariances.removeFirst()
+            }
+        }
         
-        // Update bearing from gyroscope
-        // iOS gyroscope Z-axis is inverted compared to Android
-        let gyroZ = motion.rotationRate.z
-        currentBearing += gyroZ * updateInterval * (-180.0 / .pi)
+        // Peak-valley step detection
+        if filteredAcceleration.count >= 3 {
+            detectPeaksAndValidateSteps(timestamp: timestamp)
+        }
         
-        // Normalize bearing to 0-360
-        while currentBearing < 0 { currentBearing += 360 }
-        while currentBearing >= 360 { currentBearing -= 360 }
+        lastFilteredMagnitude = filtered
         
-        // Detect steps
-        detectStep(filteredValue)
-        
-        // Update state
-        updateState(accelerationMagnitude: Float(abs(filteredValue)))
+        // Periodic debug logging (every 5 seconds)
+        if Date().timeIntervalSince(lastDebugLog) > 5.0 && totalSamples > 0 {
+            lastDebugLog = Date()
+            let recentMax = filteredAcceleration.max() ?? 0
+            let recentMin = filteredAcceleration.min() ?? 0
+            print("IMUSensorManager: [DEBUG] samples=\(totalSamples), steps=\(stepCount), range=[\(String(format: "%.4f", recentMin))...\(String(format: "%.4f", recentMax))], peak=\(String(format: "%.4f", lastPeak)), valley=\(String(format: "%.4f", lastValley))")
+        }
     }
     
-    private func applyLowPassFilter() -> Double {
-        guard filteredAcceleration.count >= 2 else {
-            return filteredAcceleration.last ?? 0
-        }
-        
-        // Simple exponential moving average as Butterworth approximation
-        let alpha = 0.3
-        var result = filteredAcceleration[0]
-        for value in filteredAcceleration.dropFirst() {
-            result = alpha * value + (1 - alpha) * result
-        }
-        return result
-    }
+    // MARK: - Peak-Valley Step Detection (MATCHING ANDROID)
     
-    private func detectStep(_ acceleration: Double) {
-        let currentTime = Date()
+    private func detectPeaksAndValidateSteps(timestamp: TimeInterval) {
+        guard filteredAcceleration.count >= 3 else { return }
+        
+        let mean = filteredAcceleration.reduce(0, +) / Double(filteredAcceleration.count)
+        let std = calculateStd(filteredAcceleration, mean: mean)
+        
+        let upperThreshold = mean + std * 1.0
+        let lowerThreshold = mean - std * 0.5
+        
+        let n = filteredAcceleration.count
+        let current = filteredAcceleration[n - 1]
+        let previous = filteredAcceleration[n - 2]
+        let beforePrevious = filteredAcceleration[n - 3]
         
         // Peak detection
-        if acceleration > lastPeak {
-            lastPeak = acceleration
-            peakConfirmed = false
-        } else if !peakConfirmed && lastPeak - acceleration > stepThreshold {
-            peakConfirmed = true
+        if previous > beforePrevious &&
+           previous > current &&
+           previous > upperThreshold &&
+           previous >= lastFilteredMagnitude {
+            lastPeak = previous
+            lastPeakTime = accelerationTimestamps.count >= 2 ?
+                accelerationTimestamps[accelerationTimestamps.count - 2] : timestamp
         }
         
-        // Valley detection
-        if acceleration < lastValley {
-            lastValley = acceleration
-            valleyConfirmed = false
-        } else if !valleyConfirmed && acceleration - lastValley > stepThreshold {
-            valleyConfirmed = true
-        }
-        
-        // Confirm step when both peak and valley detected
-        if peakConfirmed && valleyConfirmed {
+        // Valley detection (after a peak)
+        if previous < beforePrevious &&
+           previous < current &&
+           previous < lowerThreshold &&
+           lastPeakTime > 0 {
+            
+            lastValley = previous
             let peakValleyDiff = lastPeak - lastValley
             
-            // Validate step timing
-            var isValidStep = true
-            if let lastTime = lastStepTime {
-                let timeSinceLastStep = currentTime.timeIntervalSince(lastTime)
-                isValidStep = timeSinceLastStep >= minStepInterval && timeSinceLastStep <= maxStepInterval
-            }
-            
-            if isValidStep && peakValleyDiff > stepThreshold {
-                // Record step period
-                if let lastTime = lastStepTime {
-                    let stepPeriod = currentTime.timeIntervalSince(lastTime)
-                    recentStepPeriods.append(stepPeriod)
-                    if recentStepPeriods.count > 10 {
-                        recentStepPeriods.removeFirst()
-                    }
-                }
+            if peakValleyDiff > stepPeakThreshold {
+                let currentDate = Date()
                 
-                // Calculate step length using Weinberg method
-                currentStepLength = calculateStepLength(peakValleyDiff)
-                
-                // Update calibration data if calibrating
-                if stepFactorCalibration.isCalibrating {
-                    stepFactorCalibration.addStepData(peakValleyDifference: peakValleyDiff)
+                if let lastStep = lastStepTime {
+                    let timeSinceLastStep = currentDate.timeIntervalSince(lastStep)
                     
-                    // Update UI for real-time calibration feedback
-                    DispatchQueue.main.async { [weak self] in
-                        self?.imuState.calibrationStepCount = self?.stepFactorCalibration.getStepCount() ?? 0
+                    if timeSinceLastStep >= minStepPeriod && timeSinceLastStep <= maxStepPeriod {
+                        confirmStep(peakValleyDiff: peakValleyDiff, period: timeSinceLastStep, date: currentDate)
+                    } else if timeSinceLastStep > maxStepPeriod {
+                        confirmStep(peakValleyDiff: peakValleyDiff, period: 0.6, date: currentDate)
                     }
+                } else {
+                    confirmStep(peakValleyDiff: peakValleyDiff, period: 0.6, date: currentDate)
                 }
-                
-                // Update step count and position
-                stepCount += 1
-                lastStepTime = currentTime
-                updatePositionFromStep()
-                
-                // Notify calibration manager
-                calibrationManager?.updateCalibration(
-                    currentImuPosition: getCurrentPosition(),
-                    stepCount: stepCount
-                )
             }
-            
-            // Reset for next step detection
-            lastPeak = acceleration
-            lastValley = acceleration
-            peakConfirmed = false
-            valleyConfirmed = false
         }
     }
     
-    private func calculateStepLength(_ peakValleyDiff: Double) -> Double {
-        let beta = stepFactorCalibration.getUserBeta()
-        return beta * pow(peakValleyDiff, 0.25)
+    private func confirmStep(peakValleyDiff: Double, period: TimeInterval, date: Date) {
+        stepCount += 1
+        lastStepTime = date
+        
+        recentStepPeriods.append(period)
+        if recentStepPeriods.count > 10 { recentStepPeriods.removeFirst() }
+        
+        let beta = stepFactorCalibration.isCalibrationValid() ?
+            stepFactorCalibration.getUserBeta() : defaultBeta
+        currentStepLength = beta * pow(peakValleyDiff, 0.25)
+        currentStepLength = min(max(currentStepLength, 0.3), 1.2)
+        
+        if stepFactorCalibration.isCalibrating {
+            stepFactorCalibration.addStepData(peakValleyDifference: peakValleyDiff)
+        }
+        
+        detectedPeaks.append(lastPeak)
+        if detectedPeaks.count > 20 { detectedPeaks.removeFirst() }
+        
+        updatePosition()
+        calibrationManager?.updateCalibration(currentImuPosition: getCurrentPosition(), stepCount: stepCount)
+        
+        print("IMUSensorManager: Step #\(stepCount) pvDiff=\(String(format: "%.3f", peakValleyDiff)), len=\(String(format: "%.2f", currentStepLength))m, bearing=\(String(format: "%.1f", currentBearing))°")
     }
     
-    private func updatePositionFromStep() {
+    private func processGyroscope(_ rotationRate: CMRotationRate, timestamp: TimeInterval) {
+        guard initialBearingSet else { return }
+        
+        if lastTimestamp != 0 {
+            let dt = timestamp - lastTimestamp
+            let gyroZ = rotationRate.z
+            
+            if abs(gyroZ) >= gyroNoiseThreshold && abs(gyroZ) <= maxGyroRate {
+                let deltaBearing = gyroZ * dt * (-180.0 / .pi)
+                gyroIntegrationBearing = (gyroIntegrationBearing + deltaBearing)
+                    .truncatingRemainder(dividingBy: 360)
+                if gyroIntegrationBearing < 0 { gyroIntegrationBearing += 360 }
+                
+                let result = applyBearingCorrection(gyroIntegrationBearing)
+                currentBearing = result.bearing
+            }
+        }
+        
+        lastTimestamp = timestamp
+    }
+    
+    private func updatePosition() {
         let bearingRad = currentBearing * .pi / 180.0
-        currentPosition = Position(
-            x: currentPosition.x + currentStepLength * sin(bearingRad),
-            y: currentPosition.y + currentStepLength * cos(bearingRad),
+        currentX += currentStepLength * sin(bearingRad)
+        currentY += currentStepLength * cos(bearingRad)
+    }
+    
+    private func applyBearingCorrection(_ rawBearing: Double) -> BearingResult {
+        guard currentSegmentId >= 0 && currentSegmentId < pathBearings.count else {
+            return BearingResult(rawBearing, false)
+        }
+        let trueBearing = pathBearings[currentSegmentId]
+        let diff = calculateBearingDifference(rawBearing, trueBearing)
+        if abs(diff) <= bearingCorrectionThreshold {
+            bearingCorrectionCount += 1
+            return BearingResult(trueBearing, true)
+        }
+        return BearingResult(rawBearing, false)
+    }
+    
+    private func calculateBearingDifference(_ bearing1: Double, _ bearing2: Double) -> Double {
+        var diff = bearing1 - bearing2
+        while diff > 180 { diff -= 360 }
+        while diff < -180 { diff += 360 }
+        return diff
+    }
+    
+    private func calculateVariance(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        let mean = values.reduce(0, +) / Double(values.count)
+        return values.reduce(0) { $0 + pow($1 - mean, 2) } / Double(values.count)
+    }
+    
+    private func calculateStd(_ values: [Double], mean: Double) -> Double {
+        guard values.count > 1 else { return 0 }
+        let variance = values.reduce(0) { $0 + pow($1 - mean, 2) } / Double(values.count)
+        return sqrt(variance)
+    }
+    
+    private func updateIMUState() {
+        let isMoving = !accelerationVariances.isEmpty &&
+                       accelerationVariances.suffix(3).contains { $0 > varianceThreshold }
+        
+        let filterQuality: String
+        if detectedPeaks.count >= 3 && !recentStepPeriods.isEmpty {
+            filterQuality = "Excellent"
+        } else if filteredAcceleration.count >= dynamicWindowSize {
+            filterQuality = "Good"
+        } else {
+            filterQuality = "Initializing"
+        }
+        
+        imuState = IMUState(
+            position: getCurrentPosition(),
+            stepCount: stepCount,
+            isCalibrated: calibrationManager?.isCalibrationValid() ?? false,
+            accelerationMagnitude: Float(filteredAcceleration.last ?? 0),
+            isMoving: isMoving,
+            currentStepLength: currentStepLength,
+            filterQuality: filterQuality,
+            beta: stepFactorCalibration.getUserBeta(),
+            isStepCalibrationValid: stepFactorCalibration.isCalibrationValid(),
+            isCalibrating: stepFactorCalibration.isCalibrating,
+            calibrationStepCount: 0,
             bearing: currentBearing
         )
     }
+}
+
+// MARK: - Real Butterworth Bandpass Filter (SAME AS ANDROID)
+
+class ButterworthBandpassFilter {
+    private let a0: Double = 1.0
+    private let a1: Double = -1.6255829582907484
+    private let a2: Double = 0.6675381679326730
+    private let b0: Double = 0.16623091603366352
+    private let b1: Double = 0.0
+    private let b2: Double = -0.16623091603366352
     
-    private func updateState(accelerationMagnitude: Float = 0) {
-        let isMoving = recentStepPeriods.count > 0 &&
-                      (lastStepTime.map { Date().timeIntervalSince($0) < 2.0 } ?? false)
-        
-        let isCalibrated = calibrationManager?.isCalibrationValid() ?? false
-        
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            self.imuState = IMUState(
-                position: self.currentPosition,
-                stepCount: self.stepCount,
-                isCalibrated: isCalibrated,
-                accelerationMagnitude: accelerationMagnitude,
-                isMoving: isMoving,
-                currentStepLength: self.currentStepLength,
-                filterQuality: self.getFilterQuality(),
-                beta: self.stepFactorCalibration.getUserBeta(),
-                isStepCalibrationValid: self.stepFactorCalibration.isCalibrationValid(),
-                isCalibrating: self.stepFactorCalibration.isCalibrating,
-                calibrationStepCount: self.stepFactorCalibration.getStepCount(),
-                bearing: self.currentBearing
-            )
-        }
+    private var x1: Double = 0
+    private var x2: Double = 0
+    private var y1: Double = 0
+    private var y2: Double = 0
+    
+    func filter(_ input: Double) -> Double {
+        let output = (b0 * input + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2) / a0
+        x2 = x1; x1 = input
+        y2 = y1; y1 = output
+        return output
     }
     
-    private func getFilterQuality() -> String {
-        let sampleCount = filteredAcceleration.count
-        if sampleCount < 3 { return "Initializing" }
-        if sampleCount < filterWindowSize / 2 { return "Warming Up" }
-        if sampleCount < filterWindowSize { return "Good" }
-        return "Excellent"
+    func reset() {
+        x1 = 0; x2 = 0
+        y1 = 0; y2 = 0
     }
 }
 
@@ -398,66 +479,48 @@ class UserStepFactorCalibration {
     private var calibratedBeta: Double = 0.6
     private var isValid: Bool = false
     
-    private let calibrationDistance: Double = 20.0 // meters
+    private let calibrationDistance: Double = 20.0
     private let defaultBeta: Double = 0.6
-    
-    func getStepCount() -> Int {
-        return userStepCount
-    }
     
     func startCalibration() {
         isCalibrating = true
         userStepCount = 0
         accumulatedAccelerationDiff = 0
-        print("UserStepFactorCalibration: Started - walk exactly 20 meters")
     }
     
     func addStepData(peakValleyDifference: Double) {
         guard isCalibrating && peakValleyDifference > 0 else { return }
-        
         let accDiff = pow(peakValleyDifference, 0.25)
         accumulatedAccelerationDiff += accDiff
         userStepCount += 1
-        
-        print("UserStepFactorCalibration: Step \(userStepCount) - accDiff: \(String(format: "%.3f", accDiff))")
     }
     
     func completeCalibration() {
         guard isCalibrating else { return }
-        
         if accumulatedAccelerationDiff > 0 {
             userBeta = calibrationDistance / accumulatedAccelerationDiff
             isValid = userBeta > 0.1 && userBeta < 2.0
-            
-            if isValid {
-                calibratedBeta = userBeta
-                print("UserStepFactorCalibration: Complete - beta: \(String(format: "%.4f", userBeta)), steps: \(userStepCount)")
-            } else {
-                print("UserStepFactorCalibration: Result out of range - beta: \(String(format: "%.4f", userBeta))")
-            }
-        } else {
-            print("UserStepFactorCalibration: Failed - insufficient data")
+            if isValid { calibratedBeta = userBeta }
         }
-        
         isCalibrating = false
     }
     
     func stopCalibration() -> Bool {
         guard isCalibrating else { return false }
-        
         if accumulatedAccelerationDiff > 0 && userStepCount > 0 {
             let estimatedDistance = Double(userStepCount) * 0.65
             userBeta = estimatedDistance / accumulatedAccelerationDiff
             isValid = userBeta > 0.1 && userBeta < 2.0
-            
-            if isValid {
-                calibratedBeta = userBeta
-                print("UserStepFactorCalibration: Stopped early - beta: \(String(format: "%.4f", userBeta))")
-            }
+            if isValid { calibratedBeta = userBeta }
         }
-        
         isCalibrating = false
         return isValid
+    }
+    
+    func cancel() {
+        isCalibrating = false
+        userStepCount = 0
+        accumulatedAccelerationDiff = 0
     }
     
     func getUserBeta() -> Double {
@@ -467,11 +530,19 @@ class UserStepFactorCalibration {
     func isCalibrationValid() -> Bool {
         return isValid
     }
+}
+
+// MARK: - Acceleration Logger
+
+class AccelerationLogger {
+    private var samples: [AccelerationSample] = []
+    private let maxSamples = 1000
     
-    func cancel() {
-        isCalibrating = false
-        userStepCount = 0
-        accumulatedAccelerationDiff = 0
-        print("UserStepFactorCalibration: Cancelled")
+    func addSample(_ sample: AccelerationSample) {
+        samples.append(sample)
+        if samples.count > maxSamples { samples.removeFirst() }
     }
+    
+    func getSamples() -> [AccelerationSample] { return samples }
+    func clear() { samples.removeAll() }
 }

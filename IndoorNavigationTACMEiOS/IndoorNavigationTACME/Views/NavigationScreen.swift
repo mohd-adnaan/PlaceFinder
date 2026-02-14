@@ -272,7 +272,7 @@ struct NavigationScreen: View {
     }
     
     private func refreshState() {
-        sensorManager.clearAccumulatedData()
+        sensorManager.resetPosition()
         qrDetector.resetDetection()
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()

@@ -2,6 +2,7 @@
 //  ConversationManager.swift
 //  IndoorNavigationTACME
 //
+//
 
 import Foundation
 import Speech
@@ -278,9 +279,10 @@ class ConversationManager: ObservableObject {
                 if let source = locationIntent.source { sourceLocation = source }
                 if let destination = locationIntent.destination { destinationLocation = destination }
                 
-                if sourceLocation != nil && destinationLocation != nil {
-                    let response = "Starting navigation from \(sourceLocation!) to \(destinationLocation!)."
-                    await handleGPTResponse(response)
+                if let source = sourceLocation, let dest = destinationLocation {
+                    // CRITICAL FIX: Fetch route data from server with conversationMode=true
+                    // This gives us detailed directions, landmarks, distances
+                    await fetchRouteDataAndRespond(source: source, destination: dest, userInput: englishInput)
                     return
                 }
             }
@@ -313,6 +315,54 @@ class ConversationManager: ObservableObject {
         }
     }
     
+    /// Fetch route data from server in conversation mode (MATCHING ANDROID)
+    private func fetchRouteDataAndRespond(source: String, destination: String, userInput: String) async {
+        do {
+            print("ConversationManager: Fetching route \(source) → \(destination) in conversation mode")
+            
+            let request = InitializeRequest(
+                //action: "initialize",
+                source: source,
+                destination: destination,
+                useClockDirections: true,
+                useLandmarks: true,
+                conversationMode: true
+            )
+            
+            let response = try await NavigationAPIService.shared.initialize(request: request)
+            
+            if response.status == "success" {
+                // Extract conversation data (detailed directions with landmarks)
+                if response.conversationMode == true, let convData = response.conversationData {
+                    // Convert to JSON string for context
+                    if let jsonData = try? JSONSerialization.data(withJSONObject: convData.value, options: []),
+                       let jsonString = String(data: jsonData, encoding: .utf8) {
+                        routeData = jsonString
+                        print("ConversationManager: Route data received (\(jsonString.count) chars)")
+                    }
+                } else {
+                    routeData = response.message ?? response.instructions
+                }
+                
+                await MainActor.run {
+                    conversationState.hasRouteData = true
+                }
+                
+                conversationContext.append("User requested route from \(source) to \(destination)")
+                
+                // Now process with Gemini to generate a natural language response
+                await processWithGPT(userInput)
+                
+            } else {
+                await handleGPTResponse("I couldn't find a route from \(source) to \(destination). Please verify the location names.")
+            }
+            
+        } catch {
+            print("ConversationManager: Route fetch error: \(error)")
+            await handleGPTResponse("I couldn't connect to the navigation server. Error: \(error.localizedDescription)")
+        }
+    }
+    
     private func extractLocationsWithGPT(_ userInput: String) async -> LocationIntent {
         let systemPrompt = """
         You are a navigation assistant. Analyze user input and extract navigation info.
@@ -340,12 +390,27 @@ class ConversationManager: ObservableObject {
     }
     
     private func processWithGPT(_ input: String) async {
-        var systemPrompt = "You are a helpful indoor navigation assistant. Keep responses brief (under 50 words)."
+        // Build system prompt matching Android's buildNavigationGPTRequest
+        var systemPrompt = """
+        You are a helpful indoor navigation assistant providing clear directions.
+        Keep responses brief and conversational (under 100 words).
+        
+        When given route data:
+        1. Combine consecutive similar actions (add up steps: 2+5+3 = 10 steps)
+        2. Only mention major turns and landmarks
+        3. Keep it conversational and easy to remember
+        
+        Example good summary: "Walk straight for 15 steps, turn right at the water fountain, continue for 8 steps, and the destination is on your left."
+        """
+        
         if let source = sourceLocation, let dest = destinationLocation {
             systemPrompt += "\nCurrent route: \(source) → \(dest)"
         }
+        
         if let routeData = routeData {
-            systemPrompt += "\nRoute data: \(routeData)"
+            // Truncate if too long to avoid token limits
+            let truncated = routeData.count > 3000 ? String(routeData.prefix(3000)) + "..." : routeData
+            systemPrompt += "\n\nRoute data (with landmarks and directions):\n\(truncated)"
         }
         
         do {

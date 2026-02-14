@@ -2,6 +2,7 @@
 //  NavigationManager.swift
 //  IndoorNavigationTACME
 //
+//
 
 import Foundation
 import Combine
@@ -82,6 +83,7 @@ class NavigationManager: ObservableObject {
         self.qrDetector = qrDetector
         self.languageManager = languageManager
         calibrationManager.setSensorManager(sensorManager)
+        sensorManager.setCalibrationManager(calibrationManager)
         print("NavigationManager: Dependencies configured")
     }
     
@@ -236,6 +238,7 @@ class NavigationManager: ObservableObject {
         updateCount = 0
         retryCount = 0
         
+        // Update state ON MAIN THREAD
         await MainActor.run {
             navigationState.isCalibrated = true
             navigationState.isNavigating = true
@@ -245,8 +248,10 @@ class NavigationManager: ObservableObject {
             navigationState.qrSyncMode = "SMART_SYNC"
         }
         
-        // Start QR detection
-        qrDetector?.startScanning()
+        // Start QR detection on main thread
+        await MainActor.run {
+            qrDetector?.startScanning()
+        }
         
         let message = languageManager?.isFrench() == true
             ? (await languageManager?.translateFromEnglish("Navigation started") ?? "Navigation started")
@@ -405,9 +410,40 @@ class NavigationManager: ObservableObject {
             print("NavigationManager: First response message: \(response.message ?? "nil")")
             print("NavigationManager: First response instructions: \(response.instructions ?? "nil")")
             await handleNavigationResponse(response, isFirstUpdate: true)
+            
+            // If the first response was just "on track" (filtered), give a helpful initial direction
+            let firstMsg = (response.message ?? response.instructions ?? "").lowercased()
+            if firstMsg.contains("on track") || firstMsg.contains("no value return") || firstMsg.isEmpty {
+                let initialDirection = buildInitialDirectionInstruction()
+                if !initialDirection.isEmpty {
+                    let translated: String
+                    if languageManager?.isFrench() == true {
+                        translated = await languageManager?.translateFromEnglish(initialDirection) ?? initialDirection
+                    } else {
+                        translated = initialDirection
+                    }
+                    await MainActor.run {
+                        navigationState.currentInstruction = translated
+                    }
+                    ttsManager?.speak(translated, force: true)
+                    print("NavigationManager: 🔊 Initial direction: \(translated)")
+                }
+            }
         } catch {
             print("NavigationManager: First update error: \(error)")
         }
+    }
+    
+    /// Build a helpful initial instruction based on path data
+    private func buildInitialDirectionInstruction() -> String {
+        let source = navigationState.source
+        let destination = navigationState.destination
+        
+        guard !source.isEmpty, !destination.isEmpty else {
+            return "Start walking to begin navigation."
+        }
+        
+        return "Navigating from \(source) to \(destination). Start walking to receive turn-by-turn instructions."
     }
     
     private func startPositionUpdateLoop() {
@@ -420,10 +456,15 @@ class NavigationManager: ObservableObject {
             }
         }
     }
-    
     private func performPositionUpdate() async {
-        guard let sensorManager = sensorManager,
-              let mapPosition = sensorManager.getCurrentMapPosition() else {
+        guard let sensorManager = sensorManager else {
+            print("NavigationManager: ⚠️ performPositionUpdate - sensorManager is nil")
+            return
+        }
+        
+        guard let mapPosition = sensorManager.getCurrentMapPosition() else {
+            // This was failing silently - now we'll see it
+            print("NavigationManager: ⚠️ performPositionUpdate - getCurrentMapPosition returned nil (calibrationManager not set?)")
             return
         }
         
@@ -431,6 +472,7 @@ class NavigationManager: ObservableObject {
         let currentSteps = sensorManager.imuState.stepCount
         guard currentSteps > lastStepCount else { return }
         
+        let stepsSinceLastUpdate = currentSteps - lastStepCount
         lastStepCount = currentSteps
         
         // Get smart QR state
@@ -451,6 +493,8 @@ class NavigationManager: ObservableObject {
             qrDetected: qrDetected,
             qrCodeId: qrId
         )
+        
+        print("NavigationManager: 📍 Sending update #\(currentSteps) at (\(String(format: "%.2f", mapPosition.x)), \(String(format: "%.2f", mapPosition.y))), bearing: \(String(format: "%.1f", mapPosition.bearing))°")
         
         do {
             let response = try await NavigationAPIService.shared.updatePosition(request: request)
@@ -494,8 +538,6 @@ class NavigationManager: ObservableObject {
     
     private func handleNavigationResponse(_ response: NavigationResponse, isFirstUpdate: Bool) async {
         // CRITICAL FIX: Match Android's instruction extraction order
-        // Android: val newInstruction = response.message ?: response.instructions
-        // The server puts the actual navigation instruction in 'message' for updates
         let newInstruction = response.message ?? response.instructions
         
         guard let instruction = newInstruction, !instruction.isEmpty else {
@@ -518,7 +560,7 @@ class NavigationManager: ObservableObject {
             translatedInstruction = instruction
         }
         
-        // Update UI state
+        // Update UI state ON MAIN THREAD
         await MainActor.run {
             navigationState.currentInstruction = translatedInstruction
             navigationState.serverResponse = response.message
@@ -533,8 +575,9 @@ class NavigationManager: ObservableObject {
         if instruction.contains("Arrived! Destination") || instruction.lowercased().contains("arrived") {
             print("NavigationManager: 🎉 Destination reached!")
             // Give TTS time to speak, then stop
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
-                self?.stopNavigation()
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            await MainActor.run {
+                stopNavigation()
             }
         }
     }

@@ -196,11 +196,6 @@ struct ChatBubble: View {
                     .padding(.vertical, 8)
                     .background(message.isUser ? Color.blue : Color(.tertiarySystemBackground))
                     .cornerRadius(16)
-                
-                // Timestamp
-                Text(formatTime(message.timestamp))
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
             }
             .frame(maxWidth: UIScreen.main.bounds.width * 0.75, alignment: message.isUser ? .trailing : .leading)
             

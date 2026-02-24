@@ -14,8 +14,7 @@ actor NavigationAPIService {
     static let shared = NavigationAPIService()
     
     private init() {
-        // FIXED: Point to actual backend server
-        self.baseURL = URL(string: "https://indoornavigationtacme-production.up.railway.app")!
+        self.baseURL = URL(string: "https://cybersight.cim.mcgill.ca/navigation")!
         self.sessionId = "ios_session_\(Int(Date().timeIntervalSince1970 * 1000))"
         
         let configuration = URLSessionConfiguration.default

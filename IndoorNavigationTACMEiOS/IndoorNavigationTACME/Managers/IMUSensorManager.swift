@@ -21,6 +21,9 @@ class IMUSensorManager: ObservableObject {
     // Sensor update interval
     private let sensorUpdateInterval: TimeInterval = 0.02 // 50Hz
     
+    // Dedicated serial queue for all sensor processing (keeps main thread free)
+    private let sensorQueue = DispatchQueue(label: "com.tacme.imu.sensor", qos: .userInteractive)
+    
     // Position tracking
     private var currentX: Double = 0
     private var currentY: Double = 0
@@ -41,12 +44,12 @@ class IMUSensorManager: ObservableObject {
     private var recentStepPeriods: [TimeInterval] = []
     private var lastStepTime: Date?
     
-    // Peak-valley detection (MATCHING ANDROID)
-    private var lastFilteredMagnitude: Double = 0
+    // Peak-valley detection (ADAPTED FOR iOS — userAcceleration has gravity removed,
+    // so magnitudes are ~0–1g vs Android's ~7–12g raw. Threshold is lower accordingly.)
     private var lastPeak: Double = 0
     private var lastValley: Double = 0
     private var lastPeakTime: TimeInterval = 0
-    private let stepPeakThreshold: Double = 0.15
+    private let stepPeakThreshold: Double = 0.08
     
     // Real Butterworth bandpass filter (SAME COEFFICIENTS AS ANDROID)
     private let butterworthFilter = ButterworthBandpassFilter()
@@ -99,14 +102,17 @@ class IMUSensorManager: ObservableObject {
             return
         }
         
-        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: .main) { [weak self] motion, error in
+        motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: OperationQueue()) { [weak self] motion, error in
             guard let self = self, let motion = motion else {
                 if let error = error {
                     print("IMUSensorManager: Motion error: \(error)")
                 }
                 return
             }
-            self.processMotionUpdate(motion)
+            // Process sensor data on dedicated background queue (not main thread)
+            self.sensorQueue.async {
+                self.processMotionUpdate(motion)
+            }
         }
         
         print("IMUSensorManager: Started updates at \(1.0/sensorUpdateInterval)Hz")
@@ -127,7 +133,6 @@ class IMUSensorManager: ObservableObject {
         detectedPeaks.removeAll()
         recentStepPeriods.removeAll()
         lastStepTime = nil
-        lastFilteredMagnitude = 0
         lastPeak = 0
         lastValley = 0
         lastPeakTime = 0
@@ -262,8 +267,6 @@ class IMUSensorManager: ObservableObject {
             detectPeaksAndValidateSteps(timestamp: timestamp)
         }
         
-        lastFilteredMagnitude = filtered
-        
         // Periodic debug logging (every 5 seconds)
         if Date().timeIntervalSince(lastDebugLog) > 5.0 && totalSamples > 0 {
             lastDebugLog = Date()
@@ -273,7 +276,7 @@ class IMUSensorManager: ObservableObject {
         }
     }
     
-    // MARK: - Peak-Valley Step Detection (MATCHING ANDROID)
+    // MARK: - Peak-Valley Step Detection
     
     private func detectPeaksAndValidateSteps(timestamp: TimeInterval) {
         guard filteredAcceleration.count >= 3 else { return }
@@ -289,17 +292,16 @@ class IMUSensorManager: ObservableObject {
         let previous = filteredAcceleration[n - 2]
         let beforePrevious = filteredAcceleration[n - 3]
         
-        // Peak detection
+        // Peak detection: previous is a local maximum above the dynamic upper threshold
         if previous > beforePrevious &&
            previous > current &&
-           previous > upperThreshold &&
-           previous >= lastFilteredMagnitude {
+           previous > upperThreshold {
             lastPeak = previous
             lastPeakTime = accelerationTimestamps.count >= 2 ?
                 accelerationTimestamps[accelerationTimestamps.count - 2] : timestamp
         }
         
-        // Valley detection (after a peak)
+        // Valley detection: previous is a local minimum below lower threshold (after a peak)
         if previous < beforePrevious &&
            previous < current &&
            previous < lowerThreshold &&
@@ -423,7 +425,9 @@ class IMUSensorManager: ObservableObject {
             filterQuality = "Initializing"
         }
         
-        imuState = IMUState(
+        let calibrationStepCount = stepFactorCalibration.getCalibrationStepCount()
+        
+        let newState = IMUState(
             position: getCurrentPosition(),
             stepCount: stepCount,
             isCalibrated: calibrationManager?.isCalibrationValid() ?? false,
@@ -434,9 +438,13 @@ class IMUSensorManager: ObservableObject {
             beta: stepFactorCalibration.getUserBeta(),
             isStepCalibrationValid: stepFactorCalibration.isCalibrationValid(),
             isCalibrating: stepFactorCalibration.isCalibrating,
-            calibrationStepCount: 0,
+            calibrationStepCount: calibrationStepCount,
             bearing: currentBearing
         )
+        
+        DispatchQueue.main.async { [weak self] in
+            self?.imuState = newState
+        }
     }
 }
 
@@ -521,6 +529,10 @@ class UserStepFactorCalibration {
         isCalibrating = false
         userStepCount = 0
         accumulatedAccelerationDiff = 0
+    }
+    
+    func getCalibrationStepCount() -> Int {
+        return userStepCount
     }
     
     func getUserBeta() -> Double {

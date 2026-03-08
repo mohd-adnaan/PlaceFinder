@@ -1,10 +1,12 @@
 //
-//  NavigationScreen.swift
+//  Settingsview.swift
 //  IndoorNavigationTACME
 //
+//  Created by Mohammad Adnaan on 2026-03-07.
 //
-//  Root container view.
-//  Hosts the minimalist LandingPageView and presents SettingsView as a sheet.
+//
+//  Settings page containing navigation setup, calibration, and preferences.
+//  Previously displayed as the landing page — now accessed via gear icon.
 //
 
 import SwiftUI
@@ -223,3 +225,7 @@ struct SettingsView: View {
         )
     }
 }
+
+
+
+

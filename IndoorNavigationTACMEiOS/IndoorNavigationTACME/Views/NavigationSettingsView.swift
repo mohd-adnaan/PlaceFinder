@@ -1,9 +1,8 @@
 //
-//  Settingsview.swift
+//  NavigationSettingsView.swift
 //  IndoorNavigationTACME
 //
-//  Created by Mohammad Adnaan on 2026-03-07.
-//
+//  Created by Mohammad Adnaan on 2026-03-09.
 //
 //  Settings page containing navigation setup, calibration, and preferences.
 //  Previously displayed as the landing page — now accessed via gear icon.
@@ -11,7 +10,7 @@
 
 import SwiftUI
 
-struct SettingsView: View {
+struct NavigationSettingsView: View {
     @EnvironmentObject var navigationManager: NavigationManager
     @EnvironmentObject var sensorManager: IMUSensorManager
     @EnvironmentObject var calibrationManager: IMUCalibrationManager
@@ -71,6 +70,13 @@ struct SettingsView: View {
                         conversationActive: conversationManager.conversationState.isActive
                     )
 
+                    // Current instruction display (with all 3 required params)
+                    InstructionCard(
+                        instruction: navigationManager.navigationState.currentInstruction,
+                        isNavigating: navigationManager.navigationState.isNavigating,
+                        errorMessage: navigationManager.navigationState.errorMessage
+                    )
+
                     // Navigation controls
                     NavigationControlsView(
                         navigationState: navigationManager.navigationState,
@@ -91,10 +97,12 @@ struct SettingsView: View {
                         )
                     }
 
-                    // Current instruction card (when navigating)
-                    if navigationManager.navigationState.isNavigating,
-                       let instruction = navigationManager.navigationState.currentInstruction {
-                        InstructionCard(instruction: instruction)
+                    // Conversation section (when active)
+                    if conversationManager.conversationState.isActive {
+                        ConversationSection(
+                            conversationState: conversationManager.conversationState,
+                            onSendMessage: { conversationManager.processTextInput($0) }
+                        )
                     }
 
                     Spacer(minLength: 40)
@@ -225,7 +233,3 @@ struct SettingsView: View {
         )
     }
 }
-
-
-
-

@@ -1,9 +1,6 @@
 //
-//  Landingpageview.swift
+//  LandingPageView.swift
 //  IndoorNavigationTACME
-//
-//  Created by Mohammad Adnaan on 2026-03-07.
-//
 //
 //  Minimalist landing page with animated particle orb.
 //  Double-tap toggles conversation mode or voice navigation mode.
@@ -20,9 +17,9 @@ struct Particle: Identifiable {
     var size: CGFloat
     var opacity: Double
     var speed: CGFloat
-    var angle: CGFloat        // current angle on the orbit
-    var radius: CGFloat       // orbit radius
-    var phaseOffset: CGFloat  // random phase for organic motion
+    var angle: CGFloat
+    var radius: CGFloat
+    var phaseOffset: CGFloat
 }
 
 // MARK: - Landing Page View
@@ -33,40 +30,32 @@ struct LandingPageView: View {
     @EnvironmentObject var ttsManager: TTSManager
     @EnvironmentObject var languageManager: LanguageManager
     @EnvironmentObject var sensorManager: IMUSensorManager
+    @EnvironmentObject var voiceNavManager: VoiceNavigationManager
 
-    // Settings & voice navigation bindings
     @Binding var showSettings: Bool
     @Binding var voiceControlledMode: Bool
 
-    // Particle animation state
     @State private var particles: [Particle] = []
     @State private var animationTimer: Timer?
     @State private var pulseScale: CGFloat = 1.0
     @State private var glowOpacity: Double = 0.3
-
-    // Interaction state
-    @State private var isActive: Bool = false   // conversation or voice nav active
+    @State private var isActive: Bool = false
     @State private var showFeedbackText: Bool = false
     @State private var feedbackText: String = ""
-
-    // Voice navigation manager reference
-    @EnvironmentObject var voiceNavManager: VoiceNavigationManager
 
     private let particleCount = 180
     private let orbRadius: CGFloat = 140
 
     var body: some View {
         ZStack {
-            // Full black background
             Color.black
                 .ignoresSafeArea()
 
-            // Particle orb
             particleOrbView
                 .frame(width: orbRadius * 2.5, height: orbRadius * 2.5)
                 .scaleEffect(pulseScale)
 
-            // Top bar with settings icon
+            // Settings gear icon (top-right)
             VStack {
                 HStack {
                     Spacer()
@@ -83,15 +72,13 @@ struct LandingPageView: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 8)
-
                 Spacer()
             }
 
-            // Bottom text and status
+            // Bottom status area
             VStack {
                 Spacer()
 
-                // Feedback text (appears briefly on double tap)
                 if showFeedbackText {
                     Text(feedbackText)
                         .font(.subheadline)
@@ -101,12 +88,11 @@ struct LandingPageView: View {
                         .padding(.bottom, 4)
                 }
 
-                // Status text
                 statusText
                     .padding(.bottom, 60)
 
-                // Voice navigation status (when active)
-                if voiceNavManager.voiceInputState.currentMode != .none {
+                // Voice nav status card (only when voice flow is active)
+                if voiceNavManager.voiceInputState.currentMode != .idle {
                     voiceNavStatusView
                         .padding(.bottom, 20)
                 }
@@ -126,21 +112,13 @@ struct LandingPageView: View {
         }
         .onChange(of: conversationManager.conversationState.isActive) { active in
             isActive = active
-            if active {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    pulseScale = 1.08
-                    glowOpacity = 0.5
-                }
-            } else {
-                withAnimation(.easeInOut(duration: 0.5)) {
-                    pulseScale = 1.0
-                    glowOpacity = 0.3
-                }
+            withAnimation(.easeInOut(duration: 0.5)) {
+                pulseScale = active ? 1.08 : 1.0
+                glowOpacity = active ? 0.5 : 0.3
             }
         }
         .onChange(of: voiceNavManager.voiceInputState.isComplete) { complete in
             if complete {
-                // Voice navigation completed — auto-initialize
                 handleVoiceNavigationComplete()
             }
         }
@@ -166,7 +144,7 @@ struct LandingPageView: View {
                         .fontWeight(.light)
                         .foregroundColor(.white.opacity(0.5))
                 }
-            } else if voiceNavManager.voiceInputState.currentMode != .none {
+            } else if voiceNavManager.voiceInputState.currentMode != .idle {
                 Text(voiceNavManager.voiceInputState.debugInfo)
                     .font(.subheadline)
                     .fontWeight(.light)
@@ -184,7 +162,7 @@ struct LandingPageView: View {
         }
     }
 
-    // MARK: - Voice Nav Status
+    // MARK: - Voice Nav Status Card
 
     private var voiceNavStatusView: some View {
         VStack(spacing: 8) {
@@ -225,7 +203,6 @@ struct LandingPageView: View {
                     y: center.y + particle.y
                 )
 
-                // Gold/amber color with varying warmth
                 let warmth = particle.opacity
                 let color = Color(
                     red: 0.85 + warmth * 0.15,
@@ -245,7 +222,6 @@ struct LandingPageView: View {
                 )
             }
 
-            // Central glow
             let glowSize: CGFloat = isActive ? 60 : 40
             let glowGradient = Gradient(colors: [
                 Color(red: 0.9, green: 0.7, blue: 0.3, opacity: glowOpacity),
@@ -268,18 +244,15 @@ struct LandingPageView: View {
         }
     }
 
-    // MARK: - Particle Generation
+    // MARK: - Particle Animation
 
     private func generateParticles() {
         particles = (0..<particleCount).map { _ in
             let angle = CGFloat.random(in: 0...(2 * .pi))
             let radius = CGFloat.random(in: 20...orbRadius)
-            let x = cos(angle) * radius
-            let y = sin(angle) * radius
-
             return Particle(
-                x: x,
-                y: y,
+                x: cos(angle) * radius,
+                y: sin(angle) * radius,
                 size: CGFloat.random(in: 1.5...4.5),
                 opacity: Double.random(in: 0.2...0.8),
                 speed: CGFloat.random(in: 0.002...0.012),
@@ -306,17 +279,12 @@ struct LandingPageView: View {
         let time = CGFloat(Date().timeIntervalSince1970)
 
         for i in particles.indices {
-            // Orbital motion
             particles[i].angle += particles[i].speed * speedMultiplier
-
-            // Organic radius variation using sine wave
             let radiusVariation = sin(time * 0.5 + particles[i].phaseOffset) * 15
             let currentRadius = particles[i].radius + radiusVariation
-
             particles[i].x = cos(particles[i].angle) * currentRadius
             particles[i].y = sin(particles[i].angle) * currentRadius
 
-            // Pulse opacity when active
             if isActive {
                 let opacityPulse = sin(time * 2.0 + particles[i].phaseOffset) * 0.2
                 particles[i].opacity = min(1.0, max(0.15, particles[i].opacity + Double(opacityPulse) * 0.01))
@@ -324,30 +292,26 @@ struct LandingPageView: View {
         }
     }
 
-    // MARK: - Interaction
+    // MARK: - Interaction Handlers
 
     private func handleDoubleTap() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
 
         if voiceControlledMode {
-            // Voice controlled mode: toggle voice navigation
             handleVoiceControlledDoubleTap()
         } else {
-            // Normal mode: toggle conversation
             handleConversationDoubleTap()
         }
     }
 
     private func handleConversationDoubleTap() {
         if conversationManager.conversationState.isActive {
-            // Deactivate conversation mode
             conversationManager.stopConversationMode()
             showBriefFeedback(languageManager.currentLanguage == .french
                               ? "Mode conversation désactivé"
                               : "Conversation mode off")
         } else {
-            // Activate conversation mode
             conversationManager.startConversationMode()
             showBriefFeedback(languageManager.currentLanguage == .french
                               ? "Mode conversation activé"
@@ -356,44 +320,48 @@ struct LandingPageView: View {
     }
 
     private func handleVoiceControlledDoubleTap() {
-        if voiceNavManager.voiceInputState.currentMode != .none {
-            // Already in voice nav flow — cancel it
+        // Check voice nav mode using .idle (NOT .none — avoids Optional.none ambiguity)
+        let voiceMode: VoiceNavigationManager.InputMode = voiceNavManager.voiceInputState.currentMode
+
+        if voiceMode != .idle {
             voiceNavManager.cancelVoiceInput()
             showBriefFeedback("Voice navigation cancelled")
-        } else if conversationManager.conversationState.isActive {
-            // If conversation is active, toggle listening
-            if conversationManager.conversationState.isListening {
+            return
+        }
+
+        let convActive: Bool = conversationManager.conversationState.isActive
+        if convActive {
+            let listening: Bool = conversationManager.conversationState.isListening
+            if listening {
                 conversationManager.stopListening()
             } else {
                 conversationManager.startListening()
             }
-        } else {
-            // Start voice navigation flow
-            voiceNavManager.startVoiceInput(poiNames: navigationManager.poiNames)
-            showBriefFeedback("Voice navigation started")
+            return
         }
+
+        // Start voice navigation flow
+        let pois: [String] = navigationManager.poiNames
+        voiceNavManager.startVoiceInput(poiNames: pois)
+        showBriefFeedback("Voice navigation started")
     }
 
     private func handleVoiceNavigationComplete() {
-        let source = voiceNavManager.voiceInputState.source
-        let destination = voiceNavManager.voiceInputState.destination
+        let src: String = voiceNavManager.voiceInputState.source
+        let dst: String = voiceNavManager.voiceInputState.destination
+        guard !src.isEmpty, !dst.isEmpty else { return }
 
-        guard !source.isEmpty, !destination.isEmpty else { return }
+        showBriefFeedback("Navigating: \(src) → \(dst)")
 
-        showBriefFeedback("Navigating: \(source) → \(destination)")
-
-        // Auto-initialize navigation with the voice-selected locations
         Task {
             let result = await navigationManager.initializeWithServer(
-                source: source,
-                destination: destination,
+                source: src,
+                destination: dst,
                 useClockDirections: UserDefaults.standard.bool(forKey: "useClockDirections"),
                 useLandmarks: UserDefaults.standard.bool(forKey: "useLandmarks"),
                 conversationMode: false
             )
-
             if case .success = result {
-                // Auto-start navigation after initialization
                 let _ = await navigationManager.startNavigationWithCalibration()
             }
         }

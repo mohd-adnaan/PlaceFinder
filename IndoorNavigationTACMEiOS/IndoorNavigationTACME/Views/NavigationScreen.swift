@@ -2,14 +2,16 @@
 //  NavigationScreen.swift
 //  IndoorNavigationTACME
 //
+//  Created by Mohammad Adnaan on 2026-03-09.
 //
 //  Root container view.
 //  Hosts the minimalist LandingPageView and presents SettingsView as a sheet.
 //
 
 import SwiftUI
+import UIKit
 
-struct SettingsView: View {
+struct NavigationScreen: View {
     @EnvironmentObject var navigationManager: NavigationManager
     @EnvironmentObject var sensorManager: IMUSensorManager
     @EnvironmentObject var calibrationManager: IMUCalibrationManager
@@ -17,209 +19,161 @@ struct SettingsView: View {
     @EnvironmentObject var qrDetector: QRCodeDetector
     @EnvironmentObject var conversationManager: ConversationManager
     @EnvironmentObject var languageManager: LanguageManager
+    @EnvironmentObject var voiceNavManager: VoiceNavigationManager
 
-    @Environment(\.dismiss) var dismiss
-
-    // Navigation input state
-    @Binding var source: String
-    @Binding var destination: String
-    @Binding var useClockDirections: Bool
-    @Binding var useLandmarks: Bool
-    @Binding var voiceControlledMode: Bool
+    // Persistent UI state
+    @State private var showSettings: Bool = false
+    @State private var source: String = ""
+    @State private var destination: String = ""
+    @State private var useClockDirections: Bool = UserDefaults.standard.bool(forKey: "useClockDirections")
+    @State private var useLandmarks: Bool = UserDefaults.standard.bool(forKey: "useLandmarks")
+    @AppStorage("voiceControlledMode") private var voiceControlledMode: Bool = false
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Mode selection section
-                    modeSection
-
-                    // Navigation input section
-                    NavigationInputSection(
-                        source: $source,
-                        destination: $destination,
-                        useClockDirections: $useClockDirections,
-                        useLandmarks: $useLandmarks,
-                        ttsEnabled: ttsManager.ttsState.isEnabled,
-                        poiNames: navigationManager.poiNames,
-                        onTtsEnabledChange: { ttsManager.setEnabled($0) }
-                    )
-
-                    // Step calibration
-                    StepCalibrationCard(
-                        imuState: sensorManager.imuState,
-                        onStartCalibration: {
-                            sensorManager.startStepCalibration()
-                        },
-                        onCompleteCalibration: {
-                            sensorManager.completeStepCalibration()
-                        },
-                        onStopCalibration: {
-                            sensorManager.stopStepCalibration()
-                        }
-                    )
-
-                    // Status indicator
-                    StatusIndicatorView(
-                        isNavigating: navigationManager.navigationState.isNavigating,
-                        isCalibrated: navigationManager.navigationState.isCalibrated,
-                        ttsReady: ttsManager.ttsState.isReady,
-                        qrDetectionActive: navigationManager.navigationState.qrDetectionActive,
-                        qrDetected: qrDetector.detectionState.isDetected,
-                        conversationActive: conversationManager.conversationState.isActive
-                    )
-
-                    // Navigation controls
-                    NavigationControlsView(
-                        navigationState: navigationManager.navigationState,
-                        conversationActive: conversationManager.conversationState.isActive,
-                        canStart: !source.isEmpty && !destination.isEmpty,
-                        onInitialize: initializeNavigation,
-                        onStart: startNavigation,
-                        onStop: { navigationManager.stopNavigation() },
-                        onReset: resetAll,
-                        onRepeat: { ttsManager.repeatLastInstruction() }
-                    )
-
-                    // QR Detection card (when active)
-                    if navigationManager.navigationState.qrDetectionActive {
-                        QRDetectionCard(
-                            qrState: qrDetector.detectionState,
-                            navigationState: navigationManager.navigationState
-                        )
-                    }
-
-                    // Current instruction card (when navigating)
-                    if navigationManager.navigationState.isNavigating,
-                       let instruction = navigationManager.navigationState.currentInstruction {
-                        InstructionCard(instruction: instruction)
-                    }
-
-                    Spacer(minLength: 40)
-                }
-                .padding()
-            }
-            .navigationTitle(languageManager.getString("Navigation Setup"))
-            .navigationBarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    // Language toggle
-                    Button(action: {
-                        languageManager.toggleLanguage()
-                        ttsManager.speak(
-                            languageManager.currentLanguage == .french
-                            ? "Langue changée en français"
-                            : "Language changed to English",
-                            force: true
-                        )
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "globe")
-                            Text(languageManager.currentLanguage == .english ? "EN" : "FR")
-                                .fontWeight(.semibold)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.blue.opacity(0.1))
-                        .cornerRadius(8)
-                    }
-                }
-
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { dismiss() }) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.title3)
-                            .foregroundColor(.secondary)
-                    }
-                    .accessibilityLabel("Close settings")
-                }
-            }
-        }
-    }
-
-    // MARK: - Mode Section
-
-    private var modeSection: some View {
-        VStack(spacing: 12) {
-            // Voice Controlled Mode toggle
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Label("Voice Controlled Mode", systemImage: "mic.badge.plus")
-                        .font(.subheadline)
-                        .fontWeight(.medium)
-                        .foregroundColor(.purple)
-
-                    Text("Double-tap on home to set source & destination by voice")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Spacer()
-
-                Toggle("", isOn: $voiceControlledMode)
-                    .labelsHidden()
-                    .toggleStyle(SwitchToggleStyle(tint: .purple))
-                    .onChange(of: voiceControlledMode) { newValue in
-                        UserDefaults.standard.set(newValue, forKey: "voiceControlledMode")
-                        let message = newValue
-                            ? "Voice controlled mode enabled. Double-tap home screen to set route by voice."
-                            : "Voice controlled mode disabled. Double-tap home screen for conversation."
-                        ttsManager.speak(message, force: true)
-                    }
-            }
-            .padding()
-            .background(Color(.secondarySystemBackground))
-            .cornerRadius(12)
-        }
-    }
-
-    // MARK: - Actions
-
-    private func initializeNavigation() {
-        // Persist selections
-        UserDefaults.standard.set(useClockDirections, forKey: "useClockDirections")
-        UserDefaults.standard.set(useLandmarks, forKey: "useLandmarks")
-
-        Task {
-            let result = await navigationManager.initializeWithServer(
-                source: source,
-                destination: destination,
-                useClockDirections: useClockDirections,
-                useLandmarks: useLandmarks,
-                conversationMode: conversationManager.conversationState.isActive
+        ZStack {
+            // Main landing page
+            LandingPageView(
+                showSettings: $showSettings,
+                voiceControlledMode: $voiceControlledMode
             )
 
-            if case .failure(let error) = result {
-                print("Navigation initialization failed: \(error)")
+            // Navigation overlay when actively navigating
+            if navigationManager.navigationState.isNavigating {
+                navigationOverlay
             }
+        }
+        .sheet(isPresented: $showSettings) {
+            // FIX: Use NavigationSettingsView (renamed to avoid conflict)
+            NavigationSettingsView(
+                source: $source,
+                destination: $destination,
+                useClockDirections: $useClockDirections,
+                useLandmarks: $useLandmarks,
+                voiceControlledMode: $voiceControlledMode
+            )
+        }
+        .onAppear {
+            sensorManager.startSensors()
+        }
+        .onDisappear {
+            sensorManager.stopSensors()
         }
     }
 
-    private func startNavigation() {
-        Task {
-            let result = await navigationManager.startNavigationWithCalibration()
+    // MARK: - Navigation Overlay
 
-            if case .failure(let error) = result {
-                print("Navigation start failed: \(error)")
+    /// Floating overlay shown during active navigation on top of the landing page
+    private var navigationOverlay: some View {
+        VStack {
+            Spacer()
+
+            VStack(spacing: 12) {
+                // FIX: currentInstruction is String (not Optional) — use isEmpty check
+                let instruction = navigationManager.navigationState.currentInstruction
+                if !instruction.isEmpty && instruction != "Ready to navigate" {
+                    HStack(spacing: 10) {
+                        Image(systemName: "arrow.triangle.turn.up.right.diamond.fill")
+                            .font(.title3)
+                            .foregroundColor(.blue)
+
+                        Text(instruction)
+                            .font(.callout)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                            .multilineTextAlignment(.leading)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(.systemGray6).opacity(0.95))
+                    .cornerRadius(16)
+                }
+
+                // Navigation controls row
+                HStack(spacing: 16) {
+                    // Stop button
+                    Button(action: {
+                        navigationManager.stopNavigation()
+                        conversationManager.stopConversationMode()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "stop.fill")
+                            Text("Stop")
+                                .fontWeight(.semibold)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color.red)
+                        .foregroundColor(.white)
+                        .cornerRadius(12)
+                    }
+                    .accessibilityLabel("Stop navigation")
+
+                    // Repeat instruction button
+                    Button(action: {
+                        ttsManager.repeatLastInstruction()
+                    }) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Repeat")
+                                .fontWeight(.medium)
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.vertical, 12)
+                        .background(Color.purple.opacity(0.15))
+                        .foregroundColor(.purple)
+                        .cornerRadius(12)
+                    }
+                    .accessibilityLabel("Repeat last instruction")
+                }
+
+                // Segment / bearing info
+                if navigationManager.navigationState.currentSegmentId >= 0 {
+                    HStack {
+                        Text("Segment: \(navigationManager.navigationState.currentSegmentId)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+
+                        Spacer()
+
+                        if let bearing = navigationManager.navigationState.trueBearing {
+                            Text("Bearing: \(Int(bearing))°")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+
+                        if navigationManager.navigationState.qrDetectionActive {
+                            HStack(spacing: 4) {
+                                Circle()
+                                    .fill(navigationManager.navigationState.currentQRId != nil
+                                          ? Color.green : Color.orange)
+                                    .frame(width: 6, height: 6)
+                                Text("QR")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 4)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 40)
         }
     }
+}
 
-    private func resetAll() {
-        navigationManager.stopNavigation()
-        conversationManager.stopConversationMode()
-        sensorManager.resetPosition()
-        calibrationManager.resetCalibration()
-        qrDetector.resetDetection()
+// MARK: - Preview
 
-        source = ""
-        destination = ""
-        useClockDirections = false
-        useLandmarks = false
-
-        ttsManager.speak(
-            languageManager.getString("Interface reset successfully"),
-            force: true
-        )
+struct NavigationScreen_Previews: PreviewProvider {
+    static var previews: some View {
+        NavigationScreen()
+            .environmentObject(NavigationManager())
+            .environmentObject(IMUSensorManager())
+            .environmentObject(IMUCalibrationManager())
+            .environmentObject(TTSManager())
+            .environmentObject(QRCodeDetector())
+            .environmentObject(ConversationManager())
+            .environmentObject(LanguageManager())
+            .environmentObject(VoiceNavigationManager())
     }
 }

@@ -84,7 +84,3 @@ struct IndoorNavigationTACMEApp: App {
         print("IndoorNavigationTACME: All managers initialized successfully")
     }
 }
-
-
-
-

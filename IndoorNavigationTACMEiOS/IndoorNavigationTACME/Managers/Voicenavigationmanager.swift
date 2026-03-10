@@ -1,14 +1,10 @@
 //
-//  Voicenavigationmanager.swift
+//  VoiceNavigationManager.swift
 //  IndoorNavigationTACME
-//
-//  Created by Mohammad Adnaan on 2026-03-07.
-//
 //
 //  Voice-controlled navigation input manager.
 //  Allows users to set source and destination via speech,
 //  with confirmation flow and fuzzy POI matching.
-//  iOS port of Android's VoiceInputManager.
 //
 
 import Foundation
@@ -22,7 +18,7 @@ class VoiceNavigationManager: ObservableObject {
     // MARK: - Types
 
     enum InputMode: Equatable {
-        case none
+        case idle
         case listeningSource
         case confirmingSource
         case listeningDestination
@@ -37,7 +33,7 @@ class VoiceNavigationManager: ObservableObject {
         var source: String = ""
         var destination: String = ""
         var isComplete: Bool = false
-        var currentMode: InputMode = .none
+        var currentMode: InputMode = .idle
         var errorMessage: String = ""
         var debugInfo: String = ""
         var waitingForConfirmation: Bool = false
@@ -56,7 +52,20 @@ class VoiceNavigationManager: ObservableObject {
     private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
-    private let audioEngine = AVAudioEngine()
+
+    // ═══════════════════════════════════════════════════════════════════
+    // KEY FIX: This MUST be `var`, not `let`.
+    //
+    // AVAudioEngine created at app launch caches "no input available"
+    // because the audio session starts in .playback mode (for TTS).
+    // When we later switch to .playAndRecord, the OLD engine still
+    // returns 0 Hz / 0 channels for inputNode.outputFormat.
+    //
+    // The fix: create a FRESH AVAudioEngine AFTER configuring the
+    // audio session for recording. The new engine queries the current
+    // hardware route and gets the real microphone format.
+    // ═══════════════════════════════════════════════════════════════════
+    private var audioEngine = AVAudioEngine()
 
     private var ttsManager: TTSManager?
     private var languageManager: LanguageManager?
@@ -66,10 +75,17 @@ class VoiceNavigationManager: ObservableObject {
     private var availablePOIs: [String] = []
     private var feedbackGenerator: UIImpactFeedbackGenerator?
 
-    // Timing constants (seconds)
-    private let instructionDelay: TimeInterval = 3.5
-    private let confirmationDelay: TimeInterval = 2.5
-    private let retryDelay: TimeInterval = 2.5
+    // Session counter to invalidate stale speakThenListen callbacks
+    private var sessionCounter: Int = 0
+
+    // Silence timeout: treat last partial result as final after this duration
+    private var silenceTimer: Timer?
+    private let silenceTimeout: TimeInterval = 2.5
+    private var lastPartialResult: String = ""
+
+    private let instructionDelay: TimeInterval = 4.0  // Slightly longer to let TTS finish
+    private let confirmationDelay: TimeInterval = 3.0
+    private let retryDelay: TimeInterval = 3.0
 
     // MARK: - Initialization
 
@@ -89,11 +105,11 @@ class VoiceNavigationManager: ObservableObject {
 
     // MARK: - Public Methods
 
-    /// Start the voice input flow for source + destination
     func startVoiceInput(poiNames: [String]) {
         availablePOIs = poiNames
         tempSource = ""
         tempDestination = ""
+        sessionCounter += 1
 
         voiceInputState = VoiceInputState()
         voiceInputState.isReady = true
@@ -109,9 +125,10 @@ class VoiceNavigationManager: ObservableObject {
         speakThenListen(prompt, delay: instructionDelay)
     }
 
-    /// Cancel the voice input flow
     func cancelVoiceInput() {
-        stopListening()
+        sessionCounter += 1
+        invalidateSilenceTimer()
+        forceStopListening()
         tempSource = ""
         tempDestination = ""
         voiceInputState = VoiceInputState()
@@ -134,7 +151,7 @@ class VoiceNavigationManager: ObservableObject {
     }
 
     private func startListening() {
-        guard voiceInputState.currentMode != .none else { return }
+        guard voiceInputState.currentMode != .idle else { return }
 
         SFSpeechRecognizer.requestAuthorization { [weak self] status in
             DispatchQueue.main.async {
@@ -152,15 +169,17 @@ class VoiceNavigationManager: ObservableObject {
     }
 
     private func performStartListening() {
-        // Cancel any existing task
-        recognitionTask?.cancel()
-        recognitionTask = nil
+        // Fully clean up any previous listening state
+        forceStopListening()
 
-        // Configure audio session
+        guard voiceInputState.currentMode != .idle else { return }
+        let capturedSession = sessionCounter
+
+        // ─── Step 1: Configure audio session for recording ───
         let audioSession = AVAudioSession.sharedInstance()
         do {
             try audioSession.setCategory(.playAndRecord, mode: .measurement,
-                                         options: [.duckOthers, .defaultToSpeaker])
+                                         options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
             try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
         } catch {
             print("VoiceNavigationManager: Audio session error: \(error)")
@@ -168,6 +187,27 @@ class VoiceNavigationManager: ObservableObject {
             return
         }
 
+        // ─── Step 2: Create a FRESH AVAudioEngine ───
+        // This is THE fix. A new engine queries the CURRENT hardware route,
+        // which now includes the microphone input thanks to .playAndRecord.
+        audioEngine = AVAudioEngine()
+
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+
+        // Safety check (should no longer be needed, but belt-and-suspenders)
+        guard recordingFormat.sampleRate > 0 && recordingFormat.channelCount > 0 else {
+            print("VoiceNavigationManager: Audio format invalid even after fresh engine: \(recordingFormat.sampleRate) Hz, \(recordingFormat.channelCount) ch — retrying in 500ms")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                guard let self = self, self.sessionCounter == capturedSession else { return }
+                self.performStartListening()
+            }
+            return
+        }
+
+        print("VoiceNavigationManager: Audio format OK — \(recordingFormat.sampleRate) Hz, \(recordingFormat.channelCount) ch")
+
+        // ─── Step 3: Create recognition request ───
         recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
 
         guard let request = recognitionRequest,
@@ -177,73 +217,98 @@ class VoiceNavigationManager: ObservableObject {
         }
 
         request.shouldReportPartialResults = true
-
         if #available(iOS 13, *) {
             request.requiresOnDeviceRecognition = false
         }
 
-        voiceInputState.isListening = true
-        voiceInputState.debugInfo = "Listening..."
-
-        feedbackGenerator?.impactOccurred()
-
-        recognitionTask = recognizer.recognitionTask(with: request) {
-            [weak self] result, error in
-            guard let self = self else { return }
-
-            if let result = result {
-                let text = result.bestTranscription.formattedString
-                let isFinal = result.isFinal
-
-                DispatchQueue.main.async {
-                    self.voiceInputState.lastResult = text
-                    self.voiceInputState.debugInfo = "Heard: \(text)"
-                }
-
-                if isFinal {
-                    DispatchQueue.main.async {
-                        self.stopListening()
-                        self.processRecognitionResult(text)
-                    }
-                }
-            }
-
-            if let error = error {
-                DispatchQueue.main.async {
-                    self.stopListening()
-                    let nsError = error as NSError
-                    // Code 203 = no speech, Code 1110 = no match
-                    if nsError.code == 203 || nsError.code == 1110 {
-                        self.handleNoSpeech()
-                    } else {
-                        self.voiceInputState.errorMessage = "Recognition error"
-                        self.voiceInputState.debugInfo = "Error — retrying"
-                        self.handleSpeechError()
-                    }
-                }
-            }
-        }
-
-        // Install audio tap
-        let inputNode = audioEngine.inputNode
-        let recordingFormat = inputNode.outputFormat(forBus: 0)
+        // ─── Step 4: Install audio tap ───
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) {
             [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
         }
 
+        // ─── Step 5: Start engine ───
         audioEngine.prepare()
         do {
             try audioEngine.start()
         } catch {
             print("VoiceNavigationManager: Audio engine start error: \(error)")
             voiceInputState.errorMessage = "Microphone error"
+            inputNode.removeTap(onBus: 0)
+            return
         }
+
+        // ─── Step 6: Start recognition task ───
+        voiceInputState.isListening = true
+        voiceInputState.debugInfo = "Listening..."
+        lastPartialResult = ""
+        feedbackGenerator?.impactOccurred()
+
+        let currentSession = sessionCounter
+
+        recognitionTask = recognizer.recognitionTask(with: request) { [weak self] result, error in
+                    guard let self = self else { return }
+                    guard self.sessionCounter == currentSession else { return }
+
+                    if let result = result {
+                        let text = result.bestTranscription.formattedString
+                        let isFinal = result.isFinal
+
+                        DispatchQueue.main.async {
+                            self.voiceInputState.lastResult = text
+                            self.voiceInputState.debugInfo = "Heard: \(text)"
+                            self.lastPartialResult = text
+
+                            if isFinal {
+                                self.invalidateSilenceTimer()
+                                self.forceStopListening()
+                                self.sessionCounter += 1 // 🛑 FIX: Prevent duplicate callbacks
+                                self.processRecognitionResult(text)
+                            } else {
+                                self.resetSilenceTimer(session: currentSession)
+                            }
+                        }
+                    }
+
+                    if let error = error {
+                        guard self.sessionCounter == currentSession else { return }
+
+                        DispatchQueue.main.async {
+                            self.invalidateSilenceTimer()
+                            self.forceStopListening()
+                            self.sessionCounter += 1 // 🛑 FIX: Prevent cascading errors
+
+                            let nsError = error as NSError
+                            if nsError.code == 203 || nsError.code == 1110 {
+                                if !self.lastPartialResult.isEmpty {
+                                    self.processRecognitionResult(self.lastPartialResult)
+                                } else {
+                                    self.handleNoSpeech()
+                                }
+                            } else {
+                                self.voiceInputState.errorMessage = "Recognition error"
+                                self.voiceInputState.debugInfo = "Error — retrying"
+                                if !self.lastPartialResult.isEmpty {
+                                    self.processRecognitionResult(self.lastPartialResult)
+                                } else {
+                                    self.handleSpeechError()
+                                }
+                            }
+                        }
+                    }
+                }
     }
 
-    private func stopListening() {
-        audioEngine.stop()
+    /// Force-stop all audio and recognition — safe to call multiple times
+    private func forceStopListening() {
+        invalidateSilenceTimer()
+
+        if audioEngine.isRunning {
+            audioEngine.stop()
+        }
+        // removeTap is safe even if no tap is installed
         audioEngine.inputNode.removeTap(onBus: 0)
+
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionRequest = nil
@@ -252,10 +317,32 @@ class VoiceNavigationManager: ObservableObject {
         voiceInputState.isListening = false
     }
 
+    // MARK: - Silence Timer
+
+    private func resetSilenceTimer(session: Int) {
+            invalidateSilenceTimer()
+            silenceTimer = Timer.scheduledTimer(withTimeInterval: silenceTimeout, repeats: false) { [weak self] _ in
+                guard let self = self else { return }
+                guard self.sessionCounter == session else { return }
+                guard !self.lastPartialResult.isEmpty else { return }
+
+                print("VoiceNavigationManager: Silence timeout → treating partial as final: '\(self.lastPartialResult)'")
+                self.forceStopListening()
+                self.sessionCounter += 1 // 🛑 FIX: Stop SFSpeechRecognizer from sending a late cancellation error
+                self.processRecognitionResult(self.lastPartialResult)
+            }
+        }
+
+    private func invalidateSilenceTimer() {
+        silenceTimer?.invalidate()
+        silenceTimer = nil
+    }
+
     // MARK: - Result Processing
 
     private func processRecognitionResult(_ text: String) {
         let currentMode = voiceInputState.currentMode
+        lastPartialResult = ""
 
         switch currentMode {
         case .listeningSource:
@@ -344,7 +431,7 @@ class VoiceNavigationManager: ObservableObject {
                 speakThenListen(clarify, delay: confirmationDelay)
             }
 
-        case .none:
+        case .idle:
             break
         }
     }
@@ -368,11 +455,12 @@ class VoiceNavigationManager: ObservableObject {
 
     private func completeVoiceInput() {
         print("VoiceNavigationManager: Completed — \(tempSource) → \(tempDestination)")
+        sessionCounter += 1
 
         voiceInputState.source = tempSource
         voiceInputState.destination = tempDestination
         voiceInputState.isComplete = true
-        voiceInputState.currentMode = .none
+        voiceInputState.currentMode = .idle
         voiceInputState.waitingForConfirmation = false
         voiceInputState.isInstructing = false
         voiceInputState.debugInfo = "Voice input complete!"
@@ -386,6 +474,7 @@ class VoiceNavigationManager: ObservableObject {
     }
 
     private func restartVoiceInput() {
+        sessionCounter += 1
         tempSource = ""
         tempDestination = ""
 
@@ -409,7 +498,7 @@ class VoiceNavigationManager: ObservableObject {
         let retries = voiceInputState.retryCount + 1
 
         if retries >= voiceInputState.maxRetries {
-            voiceInputState.currentMode = .none
+            voiceInputState.currentMode = .idle
             voiceInputState.errorMessage = "Max retries reached"
             voiceInputState.debugInfo = "Could not understand \(type). Please use settings."
             ttsManager?.speakPriority(
@@ -419,13 +508,9 @@ class VoiceNavigationManager: ObservableObject {
         }
 
         voiceInputState.retryCount = retries
-
-        let prompt: String
-        if type == "source" {
-            prompt = "I didn't understand. Please say your starting location clearly."
-        } else {
-            prompt = "I didn't understand. Please say your destination clearly."
-        }
+        let prompt = type == "source"
+            ? "I didn't understand. Please say your starting location clearly."
+            : "I didn't understand. Please say your destination clearly."
 
         voiceInputState.currentMode = mode
         voiceInputState.isInstructing = true
@@ -438,7 +523,7 @@ class VoiceNavigationManager: ObservableObject {
         let retries = voiceInputState.retryCount + 1
 
         if retries >= voiceInputState.maxRetries {
-            voiceInputState.currentMode = .none
+            voiceInputState.currentMode = .idle
             ttsManager?.speakPriority("Max retries reached. Please use settings.")
             return
         }
@@ -453,123 +538,118 @@ class VoiceNavigationManager: ObservableObject {
     }
 
     private func handleNoSpeech() {
-        let prompt: String
-        switch voiceInputState.currentMode {
-        case .listeningSource:
-            prompt = "I didn't hear anything. What is your starting location?"
-        case .listeningDestination:
-            prompt = "I didn't hear anything. Where do you want to go?"
-        case .confirmingSource:
-            prompt = "Please say yes or no. Is \(tempSource) correct?"
-        case .confirmingDestination:
-            prompt = "Please say yes or no. Is \(tempDestination) correct?"
-        case .confirmingBoth:
-            prompt = "Please say yes to confirm, or no to start over."
-        case .none:
-            return
+            // 🛑 FIX: Add retry limits
+            let retries = voiceInputState.retryCount + 1
+            if retries >= voiceInputState.maxRetries {
+                voiceInputState.currentMode = .idle
+                ttsManager?.speakPriority("I'm having trouble hearing you. Max retries reached. Please use settings.")
+                return
+            }
+            voiceInputState.retryCount = retries
+
+            let prompt: String
+            switch voiceInputState.currentMode {
+            case .listeningSource:
+                prompt = "I didn't hear anything. What is your starting location?"
+            case .listeningDestination:
+                prompt = "I didn't hear anything. Where do you want to go?"
+            case .confirmingSource:
+                prompt = "Please say yes or no. Is \(tempSource) correct?"
+            case .confirmingDestination:
+                prompt = "Please say yes or no. Is \(tempDestination) correct?"
+            case .confirmingBoth:
+                prompt = "Please say yes to confirm, or no to start over."
+            case .idle:
+                return
+            }
+            voiceInputState.isInstructing = true
+            speakThenListen(prompt, delay: confirmationDelay)
         }
 
-        voiceInputState.isInstructing = true
-        speakThenListen(prompt, delay: confirmationDelay)
-    }
+        private func handleSpeechError() {
+            // 🛑 FIX: Add retry limits
+            let retries = voiceInputState.retryCount + 1
+            if retries >= voiceInputState.maxRetries {
+                voiceInputState.currentMode = .idle
+                ttsManager?.speakPriority("Speech error. Max retries reached. Please use settings.")
+                return
+            }
+            voiceInputState.retryCount = retries
 
-    private func handleSpeechError() {
-        let prompt: String
-        switch voiceInputState.currentMode {
-        case .listeningSource:
-            prompt = "Let's try again. What is your starting location?"
-        case .listeningDestination:
-            prompt = "Let's try again. Where do you want to go?"
-        default:
-            prompt = "Let's try again."
+            let prompt: String
+            switch voiceInputState.currentMode {
+            case .listeningSource:
+                prompt = "Let's try again. What is your starting location?"
+            case .listeningDestination:
+                prompt = "Let's try again. Where do you want to go?"
+            default:
+                prompt = "Let's try again."
+            }
+            voiceInputState.isInstructing = true
+            speakThenListen(prompt, delay: retryDelay)
         }
-
-        voiceInputState.isInstructing = true
-        speakThenListen(prompt, delay: retryDelay)
-    }
 
     // MARK: - Location Extraction
 
-    /// Extract a location name from spoken text using regex patterns and fuzzy POI matching
     private func extractLocation(_ text: String, expectedType: String) -> String {
         let cleanText = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         print("VoiceNavigationManager: Extracting \(expectedType) from '\(cleanText)'")
 
-        // Pattern 1: "source room 435" or "destination room 424"
-        let pattern1 = "\(expectedType)\\s+(room\\s*\\d+)"
-        if let range = cleanText.range(of: pattern1, options: .regularExpression) {
-            var location = String(cleanText[range])
-            // Remove the type prefix
-            let prefixPattern = "\(expectedType)\\s+"
-            if let prefixRange = location.range(of: prefixPattern, options: .regularExpression) {
-                location.removeSubrange(prefixRange)
+        // Pattern: "source room 435"
+        let p1 = "\(expectedType)\\s+(room\\s*\\d+)"
+        if let range = cleanText.range(of: p1, options: .regularExpression) {
+            var loc = String(cleanText[range])
+            if let pr = loc.range(of: "\(expectedType)\\s+", options: .regularExpression) {
+                loc.removeSubrange(pr)
             }
-            location = location.replacingOccurrences(of: " ", with: "")
-            print("VoiceNavigationManager: Pattern 1 match: '\(location)'")
-            return location
+            return loc.replacingOccurrences(of: " ", with: "")
         }
 
-        // Pattern 2: "source 435"
-        let pattern2 = "\(expectedType)\\s+(\\d+)"
-        if let range = cleanText.range(of: pattern2, options: .regularExpression) {
-            var number = String(cleanText[range])
-            let prefixPattern = "\(expectedType)\\s+"
-            if let prefixRange = number.range(of: prefixPattern, options: .regularExpression) {
-                number.removeSubrange(prefixRange)
+        // Pattern: "source 435"
+        let p2 = "\(expectedType)\\s+(\\d+)"
+        if let range = cleanText.range(of: p2, options: .regularExpression) {
+            var num = String(cleanText[range])
+            if let pr = num.range(of: "\(expectedType)\\s+", options: .regularExpression) {
+                num.removeSubrange(pr)
             }
-            let location = "room\(number)"
-            print("VoiceNavigationManager: Pattern 2 match: '\(location)'")
-            return location
+            return "room\(num)"
         }
 
-        // Pattern 3: Just "room 435" or "3120"
-        let pattern3 = "(?:room\\s*)?(\\d{3,4})"
-        if let range = cleanText.range(of: pattern3, options: .regularExpression) {
-            var number = String(cleanText[range])
-            // Remove "room " prefix if present
-            let roomPrefix = "room\\s*"
-            if let roomRange = number.range(of: roomPrefix, options: .regularExpression) {
-                number.removeSubrange(roomRange)
+        // Pattern: "room 435" or just "3120"
+        let p3 = "(?:room\\s*)?(\\d{3,4})"
+        if let range = cleanText.range(of: p3, options: .regularExpression) {
+            var num = String(cleanText[range])
+            if let rr = num.range(of: "room\\s*", options: .regularExpression) {
+                num.removeSubrange(rr)
             }
-            let location = "room\(number)"
-            print("VoiceNavigationManager: Pattern 3 match: '\(location)'")
-            return location
+            return "room\(num)"
         }
 
-        // Pattern 4: Fuzzy match against known POI names
-        if let matched = fuzzyMatchPOI(cleanText) {
-            print("VoiceNavigationManager: Fuzzy POI match: '\(matched)'")
-            return matched
-        }
+        // Fuzzy POI match
+        if let matched = fuzzyMatchPOI(cleanText) { return matched }
 
-        // Pattern 5: Known keyword matching (elevator, restroom, etc.)
-        let knownKeywords = ["elevator", "stairs", "staircase", "exit",
-                             "entrance", "restroom", "bathroom", "washroom",
-                             "lobby", "reception", "office", "classroom",
-                             "lab", "library", "cafeteria", "kitchen"]
+        // Keyword match
+        let keywords = ["elevator", "stairs", "staircase", "exit",
+                        "entrance", "restroom", "bathroom", "washroom",
+                        "lobby", "reception", "office", "classroom",
+                        "lab", "library", "cafeteria", "kitchen",
+                        "gender", "computer", "science", "workstation"]
 
-        for keyword in knownKeywords {
-            if cleanText.contains(keyword) {
-                if let poi = availablePOIs.first(where: {
-                    $0.lowercased().contains(keyword)
-                }) {
-                    print("VoiceNavigationManager: Keyword match: '\(poi)'")
+        for kw in keywords {
+            if cleanText.contains(kw) {
+                if let poi = availablePOIs.first(where: { $0.lowercased().contains(kw) }) {
                     return poi
                 }
             }
         }
 
-        print("VoiceNavigationManager: No match found in '\(cleanText)'")
         return ""
     }
 
-    /// Fuzzy match spoken text against available POI names
     private func fuzzyMatchPOI(_ text: String) -> String? {
-        // Remove common speech prefixes
         let prefixPattern = "(?:source|destination|starting|going to|from|to|the|my)\\s*"
         let cleanText = text.lowercased()
-            .replacingOccurrences(of: prefixPattern, with: "",
-                                  options: .regularExpression, range: nil)
+            .replacingOccurrences(of: prefixPattern, with: "", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard !cleanText.isEmpty else { return nil }
@@ -580,39 +660,29 @@ class VoiceNavigationManager: ObservableObject {
         for poi in availablePOIs {
             let poiLower = poi.lowercased()
 
-            // Direct containment (user said "restroom", POI is "allgenderrestroom")
+            // Direct containment
             if poiLower.contains(cleanText) || cleanText.contains(poiLower) {
-                let minLen = Double(min(cleanText.count, poiLower.count))
-                let maxLen = Double(max(cleanText.count, poiLower.count))
-                let score = maxLen > 0 ? minLen / maxLen : 0
-                if score > bestScore {
-                    bestScore = score
-                    bestMatch = poi
-                }
+                let score = Double(min(cleanText.count, poiLower.count)) /
+                            Double(max(cleanText.count, poiLower.count))
+                if score > bestScore { bestScore = score; bestMatch = poi }
             }
 
             // Word-level matching
             let textWords = Set(cleanText.split(separator: " ").map { String($0) })
-            let poiWords = Set(poiLower.split(separator: " ").map { String($0) })
             let poiParts = Set(splitCamelCase(poi).map { $0.lowercased() })
-
+            let poiWords = Set(poiLower.split(separator: " ").map { String($0) })
             let allPoiWords = poiWords.union(poiParts)
             let intersection = textWords.intersection(allPoiWords)
 
             if !intersection.isEmpty {
                 let score = Double(intersection.count) / Double(max(textWords.count, 1))
-                if score > bestScore {
-                    bestScore = score
-                    bestMatch = poi
-                }
+                if score > bestScore { bestScore = score; bestMatch = poi }
             }
         }
 
-        // Only return if we have a reasonable match (>= 40%)
-        return bestScore >= 0.4 ? bestMatch : nil
+        return bestScore >= 0.3 ? bestMatch : nil
     }
 
-    /// Split "allGenderRestroom" or concatenated names into word components
     private func splitCamelCase(_ text: String) -> [String] {
         var words: [String] = []
         var current = ""
@@ -632,34 +702,32 @@ class VoiceNavigationManager: ObservableObject {
 
     private func isPositiveResponse(_ text: String) -> Bool {
         let cleaned = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let positives = ["yes", "yeah", "yep", "correct", "right", "true",
-                         "affirmative", "sure", "ok", "okay", "that's right",
-                         "oui", "exactement"]
-        return positives.contains(where: { cleaned.contains($0) })
+        return ["yes", "yeah", "yep", "correct", "right", "true",
+                "affirmative", "sure", "ok", "okay", "that's right",
+                "oui", "exactement"].contains(where: { cleaned.contains($0) })
     }
 
     private func isNegativeResponse(_ text: String) -> Bool {
         let cleaned = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        let negatives = ["no", "nope", "wrong", "incorrect", "false",
-                         "try again", "retry", "non", "pas correct"]
-        return negatives.contains(where: { cleaned.contains($0) })
+        return ["no", "nope", "wrong", "incorrect", "false",
+                "try again", "retry", "non", "pas correct"].contains(where: { cleaned.contains($0) })
     }
 
     // MARK: - TTS + Listen Coordination
 
-    /// Speak a prompt via TTS, then start listening after a delay
     private func speakThenListen(_ message: String, delay: TimeInterval) {
         ttsManager?.speakPriority(message)
+        let capturedSession = sessionCounter
 
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
             guard let self = self else { return }
-            guard self.voiceInputState.currentMode != .none else { return }
+            guard self.sessionCounter == capturedSession else {
+                print("VoiceNavigationManager: Stale callback ignored")
+                return
+            }
+            guard self.voiceInputState.currentMode != .idle else { return }
             self.voiceInputState.isInstructing = false
             self.startListening()
         }
     }
 }
-
-
-
-

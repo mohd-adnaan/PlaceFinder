@@ -125,6 +125,10 @@ final class ConversationManager: ObservableObject {
             self.performStartListening()
         }
     }
+    
+    func stopListening() {
+        hardStopListening()
+    }
 
     // MARK: - Context setters
 

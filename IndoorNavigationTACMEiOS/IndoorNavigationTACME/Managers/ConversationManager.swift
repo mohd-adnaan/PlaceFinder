@@ -2,7 +2,7 @@
 //  ConversationManager.swift
 //  IndoorNavigationTACME
 //
-//  Manages AI conversation: SFSpeechRecognizer → OpenAI GPT → AVSpeechSynthesizer (TTS)
+//  Manages conversation: SFSpeechRecognizer → Backend wayfinder API → AVSpeechSynthesizer (TTS)
 //
 //  ROOT CAUSE FIXES vs previous version:
 //  1. TTSManager sets audio session to .playback.  Recording tap then gets zero-byte
@@ -45,15 +45,13 @@ final class ConversationManager: ObservableObject {
     private var destinationLocation: String?
     private var routeData: String?
 
-    /// Rolling GPT message history (system prompt rebuilt each call).
-    private var chatHistory: [[String: String]] = []
-
     /// Combine subscription watching TTS speaking state.
     private var ttsSub: AnyCancellable?
     private var ttsWasSpeaking = false
 
     /// Guards against overlapping restart schedules.
     private var restartScheduled = false
+    private var restartWorkItem: DispatchWorkItem?
     private var silenceTimer: Timer?
     private let silenceDuration: TimeInterval = 1.2
 
@@ -68,7 +66,7 @@ final class ConversationManager: ObservableObject {
         self.languageManager = languageManager
         requestPermissions()
         observeTTS(ttsManager: ttsManager)
-        print("ConversationManager: configured (OpenAI backend)")
+        print("ConversationManager: configured (Backend conversation)")
     }
 
     // MARK: - Public API
@@ -77,20 +75,19 @@ final class ConversationManager: ObservableObject {
         DispatchQueue.main.async {
             self.conversationState.isActive = true
         }
-        chatHistory.removeAll()
         ttsWasSpeaking = false
         restartScheduled = false
         print("ConversationManager: Conversation mode ON")
 
         // Speak greeting, then the TTS observer auto-starts listening when it finishes.
         ttsManager?.speakPriority("Conversation mode activated. How can I help you navigate?")
-        // Safety fallback — if TTS observer misses the transition, start after 3.5 s.
-        scheduleRestart(after: 3.5)
     }
 
     func stopConversationMode() {
         print("ConversationManager: Conversation mode OFF")
         hardStopListening()
+        restartWorkItem?.cancel()
+        restartWorkItem = nil
         restartScheduled = false
         ttsWasSpeaking = false
 
@@ -98,7 +95,6 @@ final class ConversationManager: ObservableObject {
             self.conversationState = ConversationState()
             self.audioLevel = 0
         }
-        chatHistory.removeAll()
         ttsManager?.speakPriority("Conversation mode deactivated")
     }
 
@@ -112,7 +108,9 @@ final class ConversationManager: ObservableObject {
         print("ConversationManager: startListening")
 
         // Stop TTS first so its audio session doesn't conflict.
-        ttsManager?.stop()
+        if ttsManager?.ttsState.isSpeaking == true {
+            ttsManager?.stop()
+        }
 
         DispatchQueue.main.async {
             self.conversationState.isListening = true
@@ -148,14 +146,16 @@ final class ConversationManager: ObservableObject {
         guard !text.isEmpty, conversationState.isActive else { return }
 
         print("ConversationManager: processing → \"\(text)\"")
-        chatHistory.append(["role": "user", "content": text])
 
         DispatchQueue.main.async {
             self.conversationState.isProcessing = true
             self.conversationState.currentSpeechText = text
+            self.conversationState.messages.append(
+                ChatMessage(content: text, isUser: true)
+            )
         }
 
-        Task { await queryOpenAI() }
+        Task { await queryBackendConversation(for: text) }
     }
 
     // MARK: - Private: permissions
@@ -319,21 +319,23 @@ final class ConversationManager: ObservableObject {
         audioEngine.inputNode.removeTap(onBus: 0)
     }
 
-    // MARK: - Private: OpenAI
+    // MARK: - Private: Backend conversation
 
-    private func queryOpenAI() async {
-        var messages: [[String: String]] = [["role": "system", "content": buildSystemPrompt()]]
-        messages.append(contentsOf: chatHistory.suffix(12))  // keep context window manageable
-
+    private func queryBackendConversation(for userText: String) async {
         do {
-            let reply = try await OpenAIService.shared.chatCompletion(messages: messages, maxTokens: 500)
-            print("ConversationManager: GPT reply → \"\(reply.prefix(80))\"")
-            chatHistory.append(["role": "assistant", "content": reply])
+            let response = try await NavigationAPIService.shared.queryConversation(
+                userText: userText,
+                source: sourceLocation,
+                destination: destinationLocation,
+                routeData: routeData
+            )
+
+            let reply = extractBackendReply(from: response)
+            print("ConversationManager: Backend reply → \"\(reply.prefix(80))\"")
             await deliverResponse(reply)
         } catch {
-            print("ConversationManager: OpenAI error → \(error)")
-            let fallback = "I'm having trouble connecting. Please try again."
-            chatHistory.append(["role": "assistant", "content": fallback])
+            print("ConversationManager: Backend conversation error → \(error)")
+            let fallback = "Backend conversation is unavailable right now. Please try again."
             await deliverResponse(fallback)
         }
     }
@@ -359,6 +361,9 @@ final class ConversationManager: ObservableObject {
                 guard let self else { return }
 
                 if state.isSpeaking {
+                    self.restartWorkItem?.cancel()
+                    self.restartWorkItem = nil
+                    self.restartScheduled = false
                     self.ttsWasSpeaking = true
                 } else if self.ttsWasSpeaking {
                     self.ttsWasSpeaking = false
@@ -372,34 +377,66 @@ final class ConversationManager: ObservableObject {
     }
 
     private func scheduleRestart(after delay: TimeInterval) {
-        guard conversationState.isActive, !restartScheduled else { return }
+        guard conversationState.isActive else { return }
+
+        restartWorkItem?.cancel()
         restartScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-            guard let self, self.conversationState.isActive else { return }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            guard self.conversationState.isActive else { return }
             self.restartScheduled = false
+            self.restartWorkItem = nil
             if !self.conversationState.isListening, !self.conversationState.isProcessing {
                 self.startListening()
             }
         }
+
+        restartWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 
-    // MARK: - Private: system prompt
+    private func extractBackendReply(from response: NavigationResponse) -> String {
+        if let conversationData = response.conversationData?.value {
+            if let text = extractText(from: conversationData), !text.isEmpty {
+                return text
+            }
+        }
 
-    private func buildSystemPrompt() -> String {
-        var ctx = ""
-        if let src = sourceLocation, let dst = destinationLocation {
-            ctx += "User is navigating from '\(src)' to '\(dst)'. "
+        if let instructions = response.instructions?.trimmingCharacters(in: .whitespacesAndNewlines), !instructions.isEmpty {
+            return instructions
         }
-        if let route = routeData {
-            ctx += "Route: \(route.prefix(1200)). "
+
+        if let message = response.message?.trimmingCharacters(in: .whitespacesAndNewlines), !message.isEmpty {
+            return message
         }
-        return """
-        You are a concise indoor navigation assistant for visually impaired users. \
-        \(ctx)\
-        Reply in 1–3 short spoken sentences only. \
-        No markdown, no bullet points, no special characters — plain speech only. \
-        Prioritise clarity and safety.
-        """
+
+        return "I did not receive a conversational response from the backend."
+    }
+
+    private func extractText(from any: Any) -> String? {
+        if let str = any as? String {
+            return str.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        if let dict = any as? [String: Any] {
+            let preferredKeys = ["reply", "response", "text", "message", "instructions", "assistant", "output"]
+            for key in preferredKeys {
+                if let value = dict[key], let text = extractText(from: value), !text.isEmpty {
+                    return text
+                }
+            }
+        }
+
+        if let array = any as? [Any] {
+            for value in array {
+                if let text = extractText(from: value), !text.isEmpty {
+                    return text
+                }
+            }
+        }
+
+        return nil
     }
 }
 

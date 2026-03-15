@@ -167,7 +167,7 @@ struct StepCalibrationCard: View {
                                 HStack {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundColor(.green)
-                                    Text("20 meters reached! Tap 'Complete' to finish calibration.")
+                                    Text("20 meters reached! Calibration will complete automatically.")
                                         .font(.caption)
                                         .foregroundColor(.green)
                                 }
@@ -196,7 +196,7 @@ struct StepCalibrationCard: View {
                             VStack(alignment: .leading, spacing: 4) {
                                 CalibrationStep(number: 1, text: "Tap 'Start Calibration'")
                                 CalibrationStep(number: 2, text: "Walk - the app tracks your progress")
-                                CalibrationStep(number: 3, text: "Tap 'Complete' when you reach 20 meters")
+                                CalibrationStep(number: 3, text: "Calibration auto-completes after 20 meters")
                             }
                             
                             // Note about auto-tracking

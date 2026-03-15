@@ -11,6 +11,8 @@ import Combine
 
 /// Manages text-to-speech for navigation instructions
 final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
+
+    private static let premiumZoeIdentifier = "com.apple.voice.premium.en-US.Zoe"
     
     // MARK: - Published Properties
     
@@ -164,7 +166,9 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     /// Stop current speech
     func stop() {
         synthesizer.stopSpeaking(at: .immediate)
-        ttsState.isSpeaking = false
+        DispatchQueue.main.async {
+            self.ttsState.isSpeaking = false
+        }
         print("TTSManager: Stopped")
     }
     
@@ -184,7 +188,9 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     
     /// Enable or disable TTS
     func setEnabled(_ enabled: Bool) {
-        ttsState.isEnabled = enabled
+        DispatchQueue.main.async {
+            self.ttsState.isEnabled = enabled
+        }
         
         if !enabled {
             stop()
@@ -239,7 +245,9 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         lastNormalizedInstruction = ""
         lastTimedNeverMissInstructionTimes.removeAll()
         spokenOneTimeInstructions.removeAll()
-        ttsState = TTSState()
+        DispatchQueue.main.async {
+            self.ttsState = TTSState()
+        }
         print("TTSManager: Cleaned up")
     }
     
@@ -248,7 +256,7 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     private func setupAudioSession() {
         do {
             let audioSession = AVAudioSession.sharedInstance()
-            try audioSession.setCategory(.playback, mode: .default, options: [.duckOthers, .mixWithOthers])
+            try audioSession.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
             try audioSession.setActive(true)
         } catch {
             print("TTSManager: Failed to setup audio session: \(error)")
@@ -256,21 +264,18 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     }
     
     private func performSpeak(_ text: String) {
+        setupAudioSession()
+
         // Get appropriate voice based on language
-        let voice: AVSpeechSynthesisVoice?
-        if let languageManager = languageManager {
-            let locale = languageManager.getCurrentLocale()
-            voice = AVSpeechSynthesisVoice(language: locale.identifier)
-        } else {
-            voice = AVSpeechSynthesisVoice(language: "en-US")
-        }
+        let localeIdentifier = languageManager?.getCurrentLocale().identifier ?? "en-US"
+        let voice = preferredZoeVoice() ?? bestVoice(for: localeIdentifier)
         
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = voice
-        utterance.rate = speechRate
+        utterance.rate = min(max(speechRate - 0.04, 0.42), 0.58)
         utterance.pitchMultiplier = speechPitch
         utterance.preUtteranceDelay = 0
-        utterance.postUtteranceDelay = 0.1
+        utterance.postUtteranceDelay = 0.05
         
         // Stop any current speech
         if synthesizer.isSpeaking {
@@ -278,9 +283,11 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         }
         
         synthesizer.speak(utterance)
-        
-        ttsState.lastSpokenText = text
-        ttsState.lastSpeechTime = Date()
+
+        DispatchQueue.main.async {
+            self.ttsState.lastSpokenText = text
+            self.ttsState.lastSpeechTime = Date()
+        }
         
         // Track one-time instructions
         if isOneTimeInstruction(text) {
@@ -288,7 +295,37 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
             spokenOneTimeInstructions.insert(normalized)
         }
         
+        print("TTSManager: Voice=\(voice?.identifier ?? "unknown") name=\(voice?.name ?? "unknown") language=\(voice?.language ?? "unknown")")
         print("TTSManager: Speaking: \(text)")
+    }
+
+    private func preferredZoeVoice() -> AVSpeechSynthesisVoice? {
+        if let exact = AVSpeechSynthesisVoice(identifier: Self.premiumZoeIdentifier) {
+            return exact
+        }
+
+        return AVSpeechSynthesisVoice.speechVoices().first {
+            $0.language == "en-US" && $0.name.localizedCaseInsensitiveContains("Zoe")
+        }
+    }
+
+    private func bestVoice(for localeIdentifier: String) -> AVSpeechSynthesisVoice? {
+        let allVoices = AVSpeechSynthesisVoice.speechVoices()
+        let localePrefix = localeIdentifier.split(separator: "-").first.map(String.init) ?? "en"
+
+        let candidates = allVoices.filter {
+            $0.language == localeIdentifier || $0.language.hasPrefix(localePrefix)
+        }
+
+        let selectedPool = candidates.isEmpty ? allVoices : candidates
+        let sorted = selectedPool.sorted { lhs, rhs in
+            let lhsScore = (lhs.quality == .enhanced ? 2 : 1)
+            let rhsScore = (rhs.quality == .enhanced ? 2 : 1)
+            if lhsScore != rhsScore { return lhsScore > rhsScore }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+
+        return sorted.first ?? AVSpeechSynthesisVoice(language: localeIdentifier)
     }
     
     private func shouldSpeakWithPriority(_ text: String, currentTime: Date) -> Bool {

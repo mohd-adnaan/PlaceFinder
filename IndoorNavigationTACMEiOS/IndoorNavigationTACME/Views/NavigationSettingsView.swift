@@ -27,6 +27,9 @@ struct NavigationSettingsView: View {
     @Binding var useClockDirections: Bool
     @Binding var useLandmarks: Bool
     @Binding var voiceControlledMode: Bool
+    @State private var didAutoSubmitCurrentCalibration: Bool = false
+
+    private let autoCalibrationDistanceMeters: Double = 20.0
 
     var body: some View {
         NavigationView {
@@ -50,12 +53,15 @@ struct NavigationSettingsView: View {
                     StepCalibrationCard(
                         imuState: sensorManager.imuState,
                         onStartCalibration: {
+                            didAutoSubmitCurrentCalibration = false
                             sensorManager.startStepCalibration()
                         },
                         onCompleteCalibration: {
+                            didAutoSubmitCurrentCalibration = false
                             sensorManager.completeStepCalibration()
                         },
                         onStopCalibration: {
+                            didAutoSubmitCurrentCalibration = false
                             sensorManager.stopStepCalibration()
                         }
                     )
@@ -143,6 +149,21 @@ struct NavigationSettingsView: View {
                     }
                     .accessibilityLabel("Close settings")
                 }
+            }
+            .onChange(of: sensorManager.imuState.isCalibrating) { isCalibrating in
+                if !isCalibrating {
+                    didAutoSubmitCurrentCalibration = false
+                }
+            }
+            .onChange(of: sensorManager.imuState.calibrationStepCount) { stepCount in
+                guard sensorManager.imuState.isCalibrating else { return }
+                guard !didAutoSubmitCurrentCalibration else { return }
+
+                let estimatedDistance = Double(stepCount) * 0.65
+                guard estimatedDistance >= autoCalibrationDistanceMeters else { return }
+
+                didAutoSubmitCurrentCalibration = true
+                sensorManager.completeStepCalibration()
             }
         }
     }

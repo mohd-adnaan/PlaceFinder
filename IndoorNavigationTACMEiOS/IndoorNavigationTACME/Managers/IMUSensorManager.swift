@@ -43,6 +43,7 @@ class IMUSensorManager: ObservableObject {
     private var detectedPeaks: [Double] = []
     private var recentStepPeriods: [TimeInterval] = []
     private var lastStepTime: Date?
+    private var pendingStepCandidateTime: Date?
     
     // Peak-valley detection (ADAPTED FOR iOS — userAcceleration has gravity removed,
     // so magnitudes are ~0–1g vs Android's ~7–12g raw. Threshold is lower accordingly.)
@@ -72,6 +73,7 @@ class IMUSensorManager: ObservableObject {
     // Step timing constraints
     private let minStepPeriod: TimeInterval = 0.3
     private let maxStepPeriod: TimeInterval = 1.2
+    private let stationaryVarianceGateMultiplier: Double = 0.8
     
     // Acceleration logging
     private var accelerationLogger = AccelerationLogger()
@@ -83,6 +85,8 @@ class IMUSensorManager: ObservableObject {
     // MARK: - Initialization
     init() {
         setupMotionManager()
+        imuState.beta = stepFactorCalibration.getUserBeta()
+        imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
         print("IMUSensorManager: Initialized")
     }
     
@@ -133,6 +137,7 @@ class IMUSensorManager: ObservableObject {
         detectedPeaks.removeAll()
         recentStepPeriods.removeAll()
         lastStepTime = nil
+        pendingStepCandidateTime = nil
         lastPeak = 0
         lastValley = 0
         lastPeakTime = 0
@@ -312,6 +317,15 @@ class IMUSensorManager: ObservableObject {
             
             if peakValleyDiff > stepPeakThreshold {
                 let currentDate = Date()
+                let recentVariance = accelerationVariances.suffix(5).reduce(0, +) /
+                    Double(max(accelerationVariances.suffix(5).count, 1))
+                let isStationary = recentVariance < (varianceThreshold * stationaryVarianceGateMultiplier)
+
+                // Reject weak peaks when recent motion variance indicates stationary behavior.
+                if isStationary && peakValleyDiff < (stepPeakThreshold * 1.8) {
+                    pendingStepCandidateTime = nil
+                    return
+                }
                 
                 if let lastStep = lastStepTime {
                     let timeSinceLastStep = currentDate.timeIntervalSince(lastStep)
@@ -319,10 +333,31 @@ class IMUSensorManager: ObservableObject {
                     if timeSinceLastStep >= minStepPeriod && timeSinceLastStep <= maxStepPeriod {
                         confirmStep(peakValleyDiff: peakValleyDiff, period: timeSinceLastStep, date: currentDate)
                     } else if timeSinceLastStep > maxStepPeriod {
-                        confirmStep(peakValleyDiff: peakValleyDiff, period: 0.6, date: currentDate)
+                        // Require two close candidates to resume counting after long idle periods.
+                        if let candidateTime = pendingStepCandidateTime {
+                            let candidateGap = currentDate.timeIntervalSince(candidateTime)
+                            if candidateGap >= minStepPeriod && candidateGap <= maxStepPeriod {
+                                confirmStep(peakValleyDiff: peakValleyDiff, period: candidateGap, date: currentDate)
+                                pendingStepCandidateTime = nil
+                            } else {
+                                pendingStepCandidateTime = currentDate
+                            }
+                        } else {
+                            pendingStepCandidateTime = currentDate
+                        }
                     }
                 } else {
-                    confirmStep(peakValleyDiff: peakValleyDiff, period: 0.6, date: currentDate)
+                    if let candidateTime = pendingStepCandidateTime {
+                        let candidateGap = currentDate.timeIntervalSince(candidateTime)
+                        if candidateGap >= minStepPeriod && candidateGap <= maxStepPeriod {
+                            confirmStep(peakValleyDiff: peakValleyDiff, period: candidateGap, date: currentDate)
+                            pendingStepCandidateTime = nil
+                        } else {
+                            pendingStepCandidateTime = currentDate
+                        }
+                    } else {
+                        pendingStepCandidateTime = currentDate
+                    }
                 }
             }
         }
@@ -331,6 +366,7 @@ class IMUSensorManager: ObservableObject {
     private func confirmStep(peakValleyDiff: Double, period: TimeInterval, date: Date) {
         stepCount += 1
         lastStepTime = date
+        pendingStepCandidateTime = nil
         
         recentStepPeriods.append(period)
         if recentStepPeriods.count > 10 { recentStepPeriods.removeFirst() }
@@ -489,6 +525,12 @@ class UserStepFactorCalibration {
     
     private let calibrationDistance: Double = 20.0
     private let defaultBeta: Double = 0.6
+    private let calibrationBetaKey = "imu.stepCalibration.beta"
+    private let calibrationValidKey = "imu.stepCalibration.isValid"
+
+    init() {
+        loadPersistedCalibration()
+    }
     
     func startCalibration() {
         isCalibrating = true
@@ -508,7 +550,10 @@ class UserStepFactorCalibration {
         if accumulatedAccelerationDiff > 0 {
             userBeta = calibrationDistance / accumulatedAccelerationDiff
             isValid = userBeta > 0.1 && userBeta < 2.0
-            if isValid { calibratedBeta = userBeta }
+            if isValid {
+                calibratedBeta = userBeta
+                persistCalibration()
+            }
         }
         isCalibrating = false
     }
@@ -519,7 +564,10 @@ class UserStepFactorCalibration {
             let estimatedDistance = Double(userStepCount) * 0.65
             userBeta = estimatedDistance / accumulatedAccelerationDiff
             isValid = userBeta > 0.1 && userBeta < 2.0
-            if isValid { calibratedBeta = userBeta }
+            if isValid {
+                calibratedBeta = userBeta
+                persistCalibration()
+            }
         }
         isCalibrating = false
         return isValid
@@ -541,6 +589,23 @@ class UserStepFactorCalibration {
     
     func isCalibrationValid() -> Bool {
         return isValid
+    }
+
+    private func persistCalibration() {
+        UserDefaults.standard.set(calibratedBeta, forKey: calibrationBetaKey)
+        UserDefaults.standard.set(isValid, forKey: calibrationValidKey)
+    }
+
+    private func loadPersistedCalibration() {
+        let wasValid = UserDefaults.standard.bool(forKey: calibrationValidKey)
+        guard wasValid else { return }
+
+        let storedBeta = UserDefaults.standard.double(forKey: calibrationBetaKey)
+        guard storedBeta > 0.1 && storedBeta < 2.0 else { return }
+
+        calibratedBeta = storedBeta
+        userBeta = storedBeta
+        isValid = true
     }
 }
 

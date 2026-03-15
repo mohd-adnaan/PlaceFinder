@@ -69,6 +69,7 @@ class VoiceNavigationManager: ObservableObject {
 
     private var ttsManager: TTSManager?
     private var languageManager: LanguageManager?
+    private var ttsStateSubscription: AnyCancellable?
 
     private var tempSource: String = ""
     private var tempDestination: String = ""
@@ -77,15 +78,20 @@ class VoiceNavigationManager: ObservableObject {
 
     // Session counter to invalidate stale speakThenListen callbacks
     private var sessionCounter: Int = 0
+    private var pendingListenSession: Int?
+    private var delayedListenWorkItem: DispatchWorkItem?
+    private var delayedStartCheckWorkItem: DispatchWorkItem?
+    private var delayedCompletionFallbackWorkItem: DispatchWorkItem?
+    private var ttsWasSpeaking: Bool = false
 
     // Silence timeout: treat last partial result as final after this duration
     private var silenceTimer: Timer?
-    private let silenceTimeout: TimeInterval = 2.5
+    private let silenceTimeout: TimeInterval = 1.15
     private var lastPartialResult: String = ""
 
-    private let instructionDelay: TimeInterval = 4.0  // Slightly longer to let TTS finish
-    private let confirmationDelay: TimeInterval = 3.0
-    private let retryDelay: TimeInterval = 3.0
+    private let instructionDelay: TimeInterval = 1.0
+    private let confirmationDelay: TimeInterval = 0.9
+    private let retryDelay: TimeInterval = 0.8
 
     // MARK: - Initialization
 
@@ -100,6 +106,7 @@ class VoiceNavigationManager: ObservableObject {
         self.ttsManager = ttsManager
         self.languageManager = languageManager
         setupSpeechRecognizer()
+        observeTTSState(ttsManager)
         print("VoiceNavigationManager: Dependencies configured")
     }
 
@@ -127,6 +134,13 @@ class VoiceNavigationManager: ObservableObject {
 
     func cancelVoiceInput() {
         sessionCounter += 1
+        pendingListenSession = nil
+        delayedListenWorkItem?.cancel()
+        delayedListenWorkItem = nil
+        delayedStartCheckWorkItem?.cancel()
+        delayedStartCheckWorkItem = nil
+        delayedCompletionFallbackWorkItem?.cancel()
+        delayedCompletionFallbackWorkItem = nil
         invalidateSilenceTimer()
         forceStopListening()
         tempSource = ""
@@ -349,10 +363,11 @@ class VoiceNavigationManager: ObservableObject {
             let extracted = extractLocation(text, expectedType: "source")
             if !extracted.isEmpty {
                 tempSource = extracted
+                let spokenSource = speechFriendlyLocation(extracted)
                 let isFrench = languageManager?.currentLanguage == .french
                 let confirmMessage = isFrench
-                    ? "Votre point de départ est \(extracted)?"
-                    : "Is your starting location \(extracted)?"
+                    ? "Votre point de départ est \(spokenSource)?"
+                    : "Is your starting location \(spokenSource)?"
 
                 voiceInputState.currentMode = .confirmingSource
                 voiceInputState.waitingForConfirmation = true
@@ -369,10 +384,11 @@ class VoiceNavigationManager: ObservableObject {
             let extracted = extractLocation(text, expectedType: "destination")
             if !extracted.isEmpty {
                 tempDestination = extracted
+                let spokenDestination = speechFriendlyLocation(extracted)
                 let isFrench = languageManager?.currentLanguage == .french
                 let confirmMessage = isFrench
-                    ? "Votre destination est \(extracted)?"
-                    : "Is your destination \(extracted)?"
+                    ? "Votre destination est \(spokenDestination)?"
+                    : "Is your destination \(spokenDestination)?"
 
                 voiceInputState.currentMode = .confirmingDestination
                 voiceInputState.waitingForConfirmation = true
@@ -403,7 +419,7 @@ class VoiceNavigationManager: ObservableObject {
                 retryInput("source", mode: .listeningSource,
                            prompt: "Again. What is your starting location?")
             } else {
-                let clarify = "Please say yes if \(tempSource) is correct, or no to try again."
+                let clarify = "Please say yes if \(speechFriendlyLocation(tempSource)) is correct, or no to try again."
                 voiceInputState.isInstructing = true
                 speakThenListen(clarify, delay: confirmationDelay)
             }
@@ -415,7 +431,7 @@ class VoiceNavigationManager: ObservableObject {
                 retryInput("destination", mode: .listeningDestination,
                            prompt: "Again. Where do you want to go?")
             } else {
-                let clarify = "Please say yes if \(tempDestination) is correct, or no to try again."
+                let clarify = "Please say yes if \(speechFriendlyLocation(tempDestination)) is correct, or no to try again."
                 voiceInputState.isInstructing = true
                 speakThenListen(clarify, delay: confirmationDelay)
             }
@@ -440,9 +456,11 @@ class VoiceNavigationManager: ObservableObject {
 
     private func showFinalConfirmation() {
         let isFrench = languageManager?.currentLanguage == .french
+        let spokenSource = speechFriendlyLocation(tempSource)
+        let spokenDestination = speechFriendlyLocation(tempDestination)
         let finalMessage = isFrench
-            ? "Parfait! Route de \(tempSource) à \(tempDestination)."
-            : "Perfect! Route from \(tempSource) to \(tempDestination)."
+            ? "Parfait! Route de \(spokenSource) à \(spokenDestination)."
+            : "Perfect! Route from \(spokenSource) to \(spokenDestination)."
 
         voiceInputState.currentMode = .confirmingBoth
         voiceInputState.confirmationPrompt = finalMessage
@@ -466,9 +484,11 @@ class VoiceNavigationManager: ObservableObject {
         voiceInputState.debugInfo = "Voice input complete!"
 
         let isFrench = languageManager?.currentLanguage == .french
+        let spokenSource = speechFriendlyLocation(tempSource)
+        let spokenDestination = speechFriendlyLocation(tempDestination)
         let successMessage = isFrench
-            ? "Excellent! Navigation de \(tempSource) à \(tempDestination). Pointez votre caméra vers un code QR."
-            : "Excellent! Navigation from \(tempSource) to \(tempDestination). Point your camera at any QR code."
+            ? "Excellent! Navigation de \(spokenSource) à \(spokenDestination). Pointez votre caméra vers un code QR."
+            : "Excellent! Navigation from \(spokenSource) to \(spokenDestination). Point your camera at any QR code."
 
         ttsManager?.speakPriority(successMessage)
     }
@@ -554,9 +574,9 @@ class VoiceNavigationManager: ObservableObject {
             case .listeningDestination:
                 prompt = "I didn't hear anything. Where do you want to go?"
             case .confirmingSource:
-                prompt = "Please say yes or no. Is \(tempSource) correct?"
+                prompt = "Please say yes or no. Is \(speechFriendlyLocation(tempSource)) correct?"
             case .confirmingDestination:
-                prompt = "Please say yes or no. Is \(tempDestination) correct?"
+                prompt = "Please say yes or no. Is \(speechFriendlyLocation(tempDestination)) correct?"
             case .confirmingBoth:
                 prompt = "Please say yes to confirm, or no to start over."
             case .idle:
@@ -698,6 +718,24 @@ class VoiceNavigationManager: ObservableObject {
         return words
     }
 
+    private func speechFriendlyLocation(_ text: String) -> String {
+        let spaced = text
+            .replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "([A-Za-z])([0-9])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "([0-9])([A-Za-z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
+
+        if spaced.lowercased().hasPrefix("room") {
+            return spaced.replacingOccurrences(of: "room", with: "room ", options: [.caseInsensitive])
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        return spaced
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     // MARK: - Response Detection
 
     private func isPositiveResponse(_ text: String) -> Bool {
@@ -716,18 +754,93 @@ class VoiceNavigationManager: ObservableObject {
     // MARK: - TTS + Listen Coordination
 
     private func speakThenListen(_ message: String, delay: TimeInterval) {
+        delayedListenWorkItem?.cancel()
+        delayedListenWorkItem = nil
+        delayedStartCheckWorkItem?.cancel()
+        delayedStartCheckWorkItem = nil
+        delayedCompletionFallbackWorkItem?.cancel()
+        delayedCompletionFallbackWorkItem = nil
+
+        voiceInputState.isInstructing = true
+        ttsWasSpeaking = false
         ttsManager?.speakPriority(message)
         let capturedSession = sessionCounter
+        pendingListenSession = capturedSession
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+        // If TTS did not actually start (filtered/skipped), begin listening after a short grace period.
+        let startCheck = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
-            guard self.sessionCounter == capturedSession else {
+            guard self.pendingListenSession == capturedSession else { return }
+            let stillNotSpeaking = self.ttsManager?.ttsState.isSpeaking != true
+            if stillNotSpeaking && !self.ttsWasSpeaking {
+                self.schedulePendingListen(for: capturedSession, delay: 0.12)
+            }
+        }
+        delayedStartCheckWorkItem = startCheck
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: startCheck)
+
+        // Absolute failsafe: if callbacks are missed, avoid hanging forever.
+        let words = max(3, message.split(separator: " ").count)
+        let estimatedSpeech = min(9.0, max(2.2, Double(words) * 0.33))
+        let fallbackDelay = max(estimatedSpeech + 0.6, delay)
+        let completionFallback = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard self.pendingListenSession == capturedSession else { return }
+            self.schedulePendingListen(for: capturedSession, delay: 0.12)
+        }
+        delayedCompletionFallbackWorkItem = completionFallback
+        DispatchQueue.main.asyncAfter(deadline: .now() + fallbackDelay, execute: completionFallback)
+    }
+
+    private func observeTTSState(_ ttsManager: TTSManager) {
+        ttsStateSubscription = ttsManager.$ttsState
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] state in
+                guard let self = self else { return }
+
+                if state.isSpeaking {
+                    self.delayedStartCheckWorkItem?.cancel()
+                    self.delayedStartCheckWorkItem = nil
+                    self.ttsWasSpeaking = true
+                    return
+                }
+
+                // TTS transitioned from speaking -> stopped; start listening quickly.
+                if self.ttsWasSpeaking {
+                    self.ttsWasSpeaking = false
+                    self.delayedStartCheckWorkItem?.cancel()
+                    self.delayedStartCheckWorkItem = nil
+                    self.delayedCompletionFallbackWorkItem?.cancel()
+                    self.delayedCompletionFallbackWorkItem = nil
+                    if let pending = self.pendingListenSession {
+                        self.schedulePendingListen(for: pending, delay: 0.15)
+                    }
+                }
+            }
+    }
+
+    private func schedulePendingListen(for session: Int, delay: TimeInterval) {
+        delayedListenWorkItem?.cancel()
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            guard self.pendingListenSession == session else { return }
+            guard self.sessionCounter == session else {
                 print("VoiceNavigationManager: Stale callback ignored")
                 return
             }
             guard self.voiceInputState.currentMode != .idle else { return }
+
+            self.pendingListenSession = nil
+            self.delayedStartCheckWorkItem?.cancel()
+            self.delayedStartCheckWorkItem = nil
+            self.delayedCompletionFallbackWorkItem?.cancel()
+            self.delayedCompletionFallbackWorkItem = nil
             self.voiceInputState.isInstructing = false
             self.startListening()
         }
+
+        delayedListenWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 }

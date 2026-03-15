@@ -88,7 +88,9 @@ class NavigationManager: ObservableObject {
     }
     
     func setPOINames(_ names: [String]) {
-        poiNames = names
+        DispatchQueue.main.async {
+            self.poiNames = names
+        }
         print("NavigationManager: Set \(names.count) POI names")
     }
     
@@ -289,14 +291,16 @@ class NavigationManager: ObservableObject {
         lastSentQRId = nil
         
         // Update state
-        navigationState.isNavigating = false
-        navigationState.isInitialized = false
-        navigationState.isCalibrated = false
-        navigationState.currentInstruction = "Navigation stopped"
-        navigationState.initializationStep = .notStarted
-        navigationState.errorMessage = nil
-        navigationState.qrDetectionActive = false
-        navigationState.qrSyncMode = "DISABLED"
+        DispatchQueue.main.async {
+            self.navigationState.isNavigating = false
+            self.navigationState.isInitialized = false
+            self.navigationState.isCalibrated = false
+            self.navigationState.currentInstruction = "Navigation stopped"
+            self.navigationState.initializationStep = .notStarted
+            self.navigationState.errorMessage = nil
+            self.navigationState.qrDetectionActive = false
+            self.navigationState.qrSyncMode = "DISABLED"
+        }
         
         ttsManager?.speakPriority("Navigation stopped")
         

@@ -202,13 +202,24 @@ struct IMUState {
 
 // MARK: - Acceleration Sample
 
+/// Extended to match Android's AccelerationSample for research export parity.
+/// Fields isPeak, isValley, isConfirmedStep, stepLength, stepNumber, peakValleyDiff
+/// are set retroactively by the AccelerationLogger mark methods.
 struct AccelerationSample {
+    let sampleIndex: Int
     let timestamp: Date
     let x: Double
     let y: Double
     let z: Double
     let magnitude: Double
     let filtered: Double
+    // Step-detection metadata (set retroactively by logger mark methods)
+    var isPeak: Bool = false
+    var isValley: Bool = false
+    var isConfirmedStep: Bool = false
+    var stepLength: Double? = nil
+    var stepNumber: Int? = nil
+    var peakValleyDiff: Double? = nil
 }
 
 // MARK: - Bearing Result

@@ -41,6 +41,9 @@ struct NavigationScreen: View {
             if navigationManager.navigationState.isNavigating {
                 navigationOverlay
             }
+            
+            // Debug overlay — floating bug button + log panel
+            DebugOverlayView()
         }
         .sheet(isPresented: $showSettings) {
             // FIX: Use NavigationSettingsView (renamed to avoid conflict)

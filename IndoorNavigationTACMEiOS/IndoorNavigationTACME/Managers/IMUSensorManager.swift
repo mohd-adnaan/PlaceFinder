@@ -215,6 +215,24 @@ class IMUSensorManager: ObservableObject {
         return accelerationLogger.getSamples()
     }
     
+    func getAccelerationLoggerStatistics() -> (totalSamples: Int, peakCount: Int, valleyCount: Int, confirmedStepCount: Int, timeSpanMs: Int64) {
+        return accelerationLogger.getStatistics()
+    }
+    
+    func getSensorStatus() -> [String: Any] {
+        return [
+            "isInitialized": motionManager.isDeviceMotionActive,
+            "stepCount": stepCount,
+            "position": "(\(String(format: "%.2f", currentX)), \(String(format: "%.2f", currentY)))",
+            "bearing": "\(String(format: "%.1f", currentBearing))°",
+            "currentStepLength": "\(String(format: "%.2f", currentStepLength))m",
+            "dynamicWindowSize": dynamicWindowSize,
+            "filterQuality": imuState.filterQuality,
+            "detectedPeaks": detectedPeaks.count,
+            "totalSamples": totalSamples
+        ]
+    }
+    
     // MARK: - Private Methods
     
     private func setupMotionManager() {
@@ -241,6 +259,7 @@ class IMUSensorManager: ObservableObject {
         
         // Log sample
         accelerationLogger.addSample(AccelerationSample(
+            sampleIndex: 0, // overridden by logger
             timestamp: Date(),
             x: acceleration.x,
             y: acceleration.y,
@@ -304,6 +323,7 @@ class IMUSensorManager: ObservableObject {
             lastPeak = previous
             lastPeakTime = accelerationTimestamps.count >= 2 ?
                 accelerationTimestamps[accelerationTimestamps.count - 2] : timestamp
+            accelerationLogger.markLastSampleAsPeak()
         }
         
         // Valley detection: previous is a local minimum below lower threshold (after a peak)
@@ -314,6 +334,7 @@ class IMUSensorManager: ObservableObject {
             
             lastValley = previous
             let peakValleyDiff = lastPeak - lastValley
+            accelerationLogger.markLastSampleAsValley()
             
             if peakValleyDiff > stepPeakThreshold {
                 let currentDate = Date()
@@ -375,6 +396,14 @@ class IMUSensorManager: ObservableObject {
             stepFactorCalibration.getUserBeta() : defaultBeta
         currentStepLength = beta * pow(peakValleyDiff, 0.25)
         currentStepLength = min(max(currentStepLength, 0.3), 1.2)
+        
+        // Mark sample as confirmed step (Android parity)
+        accelerationLogger.markSampleAsConfirmedStep(
+            timestamp: date,
+            stepLength: currentStepLength,
+            stepNumber: stepCount,
+            peakValleyDiff: peakValleyDiff
+        )
         
         if stepFactorCalibration.isCalibrating {
             stepFactorCalibration.addStepData(peakValleyDifference: peakValleyDiff)
@@ -611,15 +640,71 @@ class UserStepFactorCalibration {
 
 // MARK: - Acceleration Logger
 
+/// Logger matching Android's AccelerationDataLogger.
+/// Stores samples and allows retroactive marking of peaks, valleys, and confirmed steps.
 class AccelerationLogger {
     private var samples: [AccelerationSample] = []
-    private let maxSamples = 1000
+    private let maxSamples = 10000
+    private var sampleCounter: Int = 0
     
     func addSample(_ sample: AccelerationSample) {
-        samples.append(sample)
+        var s = sample
+        s = AccelerationSample(
+            sampleIndex: sampleCounter,
+            timestamp: s.timestamp,
+            x: s.x, y: s.y, z: s.z,
+            magnitude: s.magnitude,
+            filtered: s.filtered,
+            isPeak: s.isPeak,
+            isValley: s.isValley,
+            isConfirmedStep: s.isConfirmedStep,
+            stepLength: s.stepLength,
+            stepNumber: s.stepNumber,
+            peakValleyDiff: s.peakValleyDiff
+        )
+        samples.append(s)
+        sampleCounter += 1
         if samples.count > maxSamples { samples.removeFirst() }
     }
     
+    /// Mark the second-to-last sample as a detected peak (matching Android)
+    func markLastSampleAsPeak() {
+        guard samples.count >= 2 else { return }
+        let idx = samples.count - 2
+        samples[idx].isPeak = true
+    }
+    
+    /// Mark the second-to-last sample as a detected valley (matching Android)
+    func markLastSampleAsValley() {
+        guard samples.count >= 2 else { return }
+        let idx = samples.count - 2
+        samples[idx].isValley = true
+    }
+    
+    /// Mark a sample (by closest timestamp) as a confirmed step
+    func markSampleAsConfirmedStep(timestamp: Date, stepLength: Double, stepNumber: Int, peakValleyDiff: Double) {
+        // Find the sample closest to the given timestamp
+        guard let idx = samples.lastIndex(where: { abs($0.timestamp.timeIntervalSince(timestamp)) < 0.5 }) else { return }
+        samples[idx].isConfirmedStep = true
+        samples[idx].stepLength = stepLength
+        samples[idx].stepNumber = stepNumber
+        samples[idx].peakValleyDiff = peakValleyDiff
+    }
+    
     func getSamples() -> [AccelerationSample] { return samples }
-    func clear() { samples.removeAll() }
+    
+    func getStatistics() -> (totalSamples: Int, peakCount: Int, valleyCount: Int, confirmedStepCount: Int, timeSpanMs: Int64) {
+        let peaks = samples.filter { $0.isPeak }.count
+        let valleys = samples.filter { $0.isValley }.count
+        let steps = samples.filter { $0.isConfirmedStep }.count
+        let span: Int64 = samples.count >= 2
+            ? Int64(samples.last!.timestamp.timeIntervalSince(samples.first!.timestamp) * 1000)
+            : 0
+        return (samples.count, peaks, valleys, steps, span)
+    }
+    
+    func clear() {
+        samples.removeAll()
+        sampleCounter = 0
+    }
 }

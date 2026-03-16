@@ -114,18 +114,23 @@ actor GeminiService {
         
         urlRequest.httpBody = try JSONSerialization.data(withJSONObject: body)
         
+        let promptPreview = request.messages.last?.content.prefix(100) ?? "empty"
+        DebugLogger.shared.geminiEvent("→ Gemini '\(model)': \(promptPreview)…")
+        
         #if DEBUG
-        print("Gemini Request to model '\(model)': \(request.messages.last?.content.prefix(100) ?? "empty")")
+        print("Gemini Request to model '\(model)': \(promptPreview)")
         #endif
         
         let (data, response) = try await session.data(for: urlRequest)
         
         guard let httpResponse = response as? HTTPURLResponse else {
+            DebugLogger.shared.error(.gemini, "Invalid response from Gemini")
             throw GeminiError.invalidResponse
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
             if let errorString = String(data: data, encoding: .utf8) {
+                DebugLogger.shared.error(.gemini, "Gemini \(httpResponse.statusCode)", detail: errorString)
                 print("Gemini Error Response (\(httpResponse.statusCode)): \(errorString)")
                 
                 // Try to parse error message
@@ -149,8 +154,13 @@ actor GeminiService {
               let parts = content["parts"] as? [[String: Any]],
               let firstPart = parts.first,
               let text = firstPart["text"] as? String else {
+            DebugLogger.shared.error(.gemini, "Failed to decode Gemini response structure")
             throw GeminiError.decodingError
         }
+        
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let preview = trimmedText.count > 120 ? String(trimmedText.prefix(120)) + "…" : trimmedText
+        DebugLogger.shared.log(.gemini, .success, "← Gemini: \(preview)")
         
         return GeminiResponse(
             text: text.trimmingCharacters(in: .whitespacesAndNewlines)

@@ -82,5 +82,7 @@ struct IndoorNavigationTACMEApp: App {
         }
 
         print("IndoorNavigationTACME: All managers initialized successfully")
+        DebugLogger.shared.log(.system, .success, "All managers initialized")
+        DebugLogger.shared.log(.system, .info, "POIs loaded: \(navigationManager.poiNames.count)")
     }
 }

@@ -11,7 +11,7 @@
 import Foundation
 import UIKit
 
-class DataExportManager {
+class DataExportManager: @unchecked Sendable {
     
     static let shared = DataExportManager()
     private init() {}

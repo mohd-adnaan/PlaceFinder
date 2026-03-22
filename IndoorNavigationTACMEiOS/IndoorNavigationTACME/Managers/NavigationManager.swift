@@ -704,6 +704,38 @@ class NavigationManager: ObservableObject {
         }
     }
     
+    func getNavigationSummary() -> [String: Any] {
+        let state = navigationState
+        let currentPosition = sensorManager?.getCurrentPosition()
+        let mapPosition = sensorManager?.getCurrentMapPosition()
+
+        return [
+            "isNavigating": state.isNavigating,
+            "isInitialized": state.isInitialized,
+            "instruction": state.currentInstruction,
+            "route": "\(state.source) → \(state.destination)",
+            "imuPosition": currentPosition.map {
+                "(\(String(format: "%.2f", $0.x)), \(String(format: "%.2f", $0.y)))"
+            } ?? "Unknown",
+            "mapPosition": mapPosition.map {
+                "(\(String(format: "%.2f", $0.x)), \(String(format: "%.2f", $0.y)))"
+            } ?? "Not calibrated",
+            "bearing": currentPosition.map {
+                "\(String(format: "%.1f", $0.bearing))°"
+            } ?? "Unknown",
+            "lastUpdate": state.lastUpdateTime.timeIntervalSinceNow < -1 ?
+                "\(Int(-state.lastUpdateTime.timeIntervalSinceNow))s ago" : "Just now",
+            "qrDetectionActive": state.qrDetectionActive,
+            "currentQRId": state.currentQRId ?? "None",
+            "lastSentQRId": state.lastSentQRId ?? "None",
+            "qrDetectionCount": state.qrDetectionCount,
+            "qrEngine": "VISION",
+            "qrSyncMode": state.qrSyncMode,
+            "currentSegmentId": state.currentSegmentId,
+            "smartQRInfo": getSmartQRInfo()
+        ]
+    }
+    
     // MARK: - Cleanup
     
     func cleanup() {

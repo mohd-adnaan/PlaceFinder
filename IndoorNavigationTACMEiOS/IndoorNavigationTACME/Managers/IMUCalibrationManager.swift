@@ -77,7 +77,16 @@ class IMUCalibrationManager: ObservableObject {
                 isBearingCalibrated = true
                 print("IMUCalibrationManager: Initial bearing set: \(bearing)°")
             } else {
-                print("IMUCalibrationManager: Recalibration - preserving existing bearing")
+                // FIX 2: On recalibration, ALSO update the bearing.
+                // Previously this branch just printed "preserving existing bearing"
+                // and did nothing — meaning the server's corrected bearing was ignored
+                // on all segment recalibrations after the initial one.
+                // This caused bearing to drift (gyro integration error accumulates)
+                // and never get corrected, leading to position spiral and crashes.
+                sensorManager?.setInitialBearing(bearing)
+                calibrationState.initialBearing = bearing
+                isBearingCalibrated = true
+                print("IMUCalibrationManager: Recalibration - bearing UPDATED to \(String(format: "%.1f", bearing))°")
             }
         }
         

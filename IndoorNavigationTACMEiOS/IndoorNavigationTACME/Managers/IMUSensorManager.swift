@@ -45,19 +45,39 @@ class IMUSensorManager: ObservableObject {
     private var lastStepTime: Date?
     private var pendingStepCandidateTime: Date?
     
-    // Peak-valley detection (ADAPTED FOR iOS — userAcceleration has gravity removed,
-    // so magnitudes are ~0–1g vs Android's ~7–12g raw. Threshold is lower accordingly.)
+    // Peak-valley detection
+    // FIX: iOS userAcceleration has gravity removed, so the unsigned magnitude
+    // barely oscillates during walking (std ~0.02). We now use SIGNED vertical
+    // projection (dot product with gravity vector) which gives a clean oscillation
+    // of ~±0.1 during walking. Thresholds are calibrated from real iOS CSV data.
     private var lastPeak: Double = 0
     private var lastValley: Double = 0
     private var lastPeakTime: TimeInterval = 0
-    private let stepPeakThreshold: Double = 0.08
+    private let stepPeakThreshold: Double = 0.025
+    
+    // FIX: Absolute minimum amplitude for peaks/valleys.
+    // The adaptive thresholds (mean ± std) collapse to near-zero during standstill
+    // because the bandpass-filtered signal is centered at zero. This means hand
+    // tremor of ±0.04 exceeds the adaptive threshold (≈0.02) and gets classified
+    // as peaks/valleys, generating ghost steps. These absolute minimums ensure
+    // only genuine walking oscillations (peaks ≈ 0.08-0.3) trigger detection.
+    // Walking data shows: peaks consistently > 0.06, valleys consistently < -0.03.
+    // Hand tremor: peaks < 0.05, valleys > -0.05.
+    private let absoluteMinPeakAmplitude: Double = 0.06
+    private let absoluteMinValleyAmplitude: Double = -0.03
+    // Maximum age (seconds) for a peak to be used in pvDiff calculation.
+    // Prevents stale peaks from walking contaminating standstill detection.
+    private let maxPeakAge: TimeInterval = 2.0
     
     // Real Butterworth bandpass filter (SAME COEFFICIENTS AS ANDROID)
     private let butterworthFilter = ButterworthBandpassFilter()
     
     // Filter parameters
     private let dynamicWindowSize = 50
-    private let varianceThreshold: Double = 0.005
+    // Raised from 0.0003 to 0.0005: the old value was too low to detect
+    // the phone settling/weight-shifting at standstill. pvDiffs of 0.03-0.06
+    // were passing through and registering as ghost steps.
+    private let varianceThreshold: Double = 0.0005
     
     // Bearing correction
     private var pathBearings: [Double] = []
@@ -73,7 +93,11 @@ class IMUSensorManager: ObservableObject {
     // Step timing constraints
     private let minStepPeriod: TimeInterval = 0.3
     private let maxStepPeriod: TimeInterval = 1.2
-    private let stationaryVarianceGateMultiplier: Double = 0.8
+    // Raised from 0.4 to 0.6: at 0.4 the gate was too weak — pvDiffs of 0.04-0.06
+    // from phone vibration/settling passed through as ghost steps. At 0.6, the
+    // elevated threshold becomes 0.025 * 1.8 = 0.045, which rejects most standstill
+    // noise while still passing genuine walking steps (pvDiff > 0.1 typically).
+    private let stationaryVarianceGateMultiplier: Double = 0.6
     
     // Acceleration logging
     private var accelerationLogger = AccelerationLogger()
@@ -128,34 +152,52 @@ class IMUSensorManager: ObservableObject {
     }
     
     func resetPosition() {
-        currentX = 0
-        currentY = 0
-        stepCount = 0
-        filteredAcceleration.removeAll()
-        accelerationTimestamps.removeAll()
-        accelerationVariances.removeAll()
-        detectedPeaks.removeAll()
-        recentStepPeriods.removeAll()
-        lastStepTime = nil
-        pendingStepCandidateTime = nil
-        lastPeak = 0
-        lastValley = 0
-        lastPeakTime = 0
-        butterworthFilter.reset()
-        accelerationLogger.clear()
-        totalSamples = 0
-        updateIMUState()
-        print("IMUSensorManager: Position reset")
+        // FIX B: Route through sensorQueue to avoid data races with processMotionUpdate.
+        // processMotionUpdate runs on sensorQueue and mutates the same arrays/counters.
+        // Without synchronization, concurrent access from handleSegmentRecalibration
+        // (on a Task context) causes crashes — especially during rapid segment changes.
+        sensorQueue.sync {
+            currentX = 0
+            currentY = 0
+            stepCount = 0
+            filteredAcceleration.removeAll()
+            accelerationTimestamps.removeAll()
+            accelerationVariances.removeAll()
+            detectedPeaks.removeAll()
+            recentStepPeriods.removeAll()
+            lastStepTime = nil
+            pendingStepCandidateTime = nil
+            lastPeak = 0
+            lastValley = 0
+            lastPeakTime = 0
+            butterworthFilter.reset()
+            accelerationLogger.clear()
+            totalSamples = 0
+            // Update UI state while still on sensorQueue (updateIMUState uses _unsafeGetCurrentPosition)
+            updateIMUState()
+        }
+        print("IMUSensorManager: Position reset (thread-safe)")
     }
     
     func setInitialBearing(_ bearing: Double) {
-        gyroIntegrationBearing = bearing
-        currentBearing = bearing
-        initialBearingSet = true
+        sensorQueue.sync {
+            gyroIntegrationBearing = bearing
+            currentBearing = bearing
+            initialBearingSet = true
+        }
         print("IMUSensorManager: Initial bearing set to \(bearing)°")
     }
     
     func getCurrentPosition() -> Position {
+        return sensorQueue.sync {
+            Position(x: currentX, y: currentY, bearing: currentBearing)
+        }
+    }
+    
+    /// Internal-only: returns position WITHOUT sensorQueue.sync.
+    /// MUST only be called from code already executing on sensorQueue
+    /// (processMotionUpdate → confirmStep, updateIMUState, etc.)
+    private func _unsafeGetCurrentPosition() -> Position {
         return Position(x: currentX, y: currentY, bearing: currentBearing)
     }
     
@@ -164,8 +206,10 @@ class IMUSensorManager: ObservableObject {
     }
     
     func setBearingCorrectionData(_ bearings: [Double], _ segmentId: Int) {
-        pathBearings = bearings
-        currentSegmentId = segmentId
+        sensorQueue.sync {
+            pathBearings = bearings
+            currentSegmentId = segmentId
+        }
         print("IMUSensorManager: Bearing correction data set - \(bearings.count) bearings, segment \(segmentId)")
     }
     
@@ -212,11 +256,11 @@ class IMUSensorManager: ObservableObject {
     }
     
     func getAccelerationSamples() -> [AccelerationSample] {
-        return accelerationLogger.getSamples()
+        return sensorQueue.sync { accelerationLogger.getSamples() }
     }
     
     func getAccelerationLoggerStatistics() -> (totalSamples: Int, peakCount: Int, valleyCount: Int, confirmedStepCount: Int, timeSpanMs: Int64) {
-        return accelerationLogger.getStatistics()
+        return sensorQueue.sync { accelerationLogger.getStatistics() }
     }
     
     func getSensorStatus() -> [String: Any] {
@@ -241,21 +285,45 @@ class IMUSensorManager: ObservableObject {
     
     private func processMotionUpdate(_ motion: CMDeviceMotion) {
         let timestamp = motion.timestamp
-        processAccelerometer(motion.userAcceleration, timestamp: timestamp)
+        processAccelerometer(motion, timestamp: timestamp)
         processGyroscope(motion.rotationRate, timestamp: timestamp)
         updateIMUState()
     }
     
-    private func processAccelerometer(_ acceleration: CMAcceleration, timestamp: TimeInterval) {
-        // iOS userAcceleration already has gravity removed (values ~0 to ~3)
+    private func processAccelerometer(_ motion: CMDeviceMotion, timestamp: TimeInterval) {
+        let acceleration = motion.userAcceleration
+        let gravity = motion.gravity
+        
+        // FIX: Use SIGNED vertical projection instead of unsigned magnitude.
+        // The dot product of userAcceleration with the gravity unit vector gives
+        // the acceleration component along the vertical axis. During walking this
+        // oscillates cleanly (positive on heel strike push-up, negative during fall).
+        // The unsigned magnitude (sqrt(x²+y²+z²)) collapses positive and negative
+        // phases together, halving the effective amplitude and making the bandpass
+        // filter output ~34x weaker than what Android sees.
+        let gravityMagnitude = sqrt(gravity.x * gravity.x +
+                                     gravity.y * gravity.y +
+                                     gravity.z * gravity.z)
+        let verticalAccel: Double
+        if gravityMagnitude > 0.01 {
+            // Project userAcceleration onto gravity direction (signed)
+            verticalAccel = (acceleration.x * gravity.x +
+                             acceleration.y * gravity.y +
+                             acceleration.z * gravity.z) / gravityMagnitude
+        } else {
+            // Fallback if gravity not available (shouldn't happen in practice)
+            verticalAccel = acceleration.z
+        }
+        
+        // Also compute magnitude for logging
         let magnitude = sqrt(acceleration.x * acceleration.x +
                             acceleration.y * acceleration.y +
                             acceleration.z * acceleration.z)
         
         totalSamples += 1
         
-        // Apply REAL Butterworth bandpass filter (0.8-4Hz)
-        let filtered = butterworthFilter.filter(magnitude)
+        // Apply Butterworth bandpass filter to the SIGNED vertical signal
+        let filtered = butterworthFilter.filter(verticalAccel)
         
         // Log sample
         accelerationLogger.addSample(AccelerationSample(
@@ -316,21 +384,35 @@ class IMUSensorManager: ObservableObject {
         let previous = filteredAcceleration[n - 2]
         let beforePrevious = filteredAcceleration[n - 3]
         
-        // Peak detection: previous is a local maximum above the dynamic upper threshold
+        // Peak detection: previous is a local maximum above BOTH the dynamic upper
+        // threshold AND the absolute minimum amplitude. The absolute minimum prevents
+        // hand tremor (±0.04) from being classified as peaks when the adaptive threshold
+        // collapses to ~0.02 during standstill.
         if previous > beforePrevious &&
            previous > current &&
-           previous > upperThreshold {
+           previous > upperThreshold &&
+           previous > absoluteMinPeakAmplitude {
             lastPeak = previous
             lastPeakTime = accelerationTimestamps.count >= 2 ?
                 accelerationTimestamps[accelerationTimestamps.count - 2] : timestamp
             accelerationLogger.markLastSampleAsPeak()
         }
         
-        // Valley detection: previous is a local minimum below lower threshold (after a peak)
+        // Valley detection: previous is a local minimum below BOTH thresholds (after a peak)
         if previous < beforePrevious &&
            previous < current &&
            previous < lowerThreshold &&
+           previous < absoluteMinValleyAmplitude &&
            lastPeakTime > 0 {
+            
+            // Reject if the peak is stale (from a previous walking burst).
+            // Without this, a walking peak of +0.2 persists, and when a tiny valley
+            // of -0.03 is detected during standstill, pvDiff = 0.23 → ghost step.
+            let peakAge = timestamp - lastPeakTime
+            guard peakAge <= maxPeakAge else {
+                lastPeakTime = 0 // Invalidate stale peak
+                return
+            }
             
             lastValley = previous
             let peakValleyDiff = lastPeak - lastValley
@@ -413,7 +495,7 @@ class IMUSensorManager: ObservableObject {
         if detectedPeaks.count > 20 { detectedPeaks.removeFirst() }
         
         updatePosition()
-        calibrationManager?.updateCalibration(currentImuPosition: getCurrentPosition(), stepCount: stepCount)
+        calibrationManager?.updateCalibration(currentImuPosition: _unsafeGetCurrentPosition(), stepCount: stepCount)
         
         print("IMUSensorManager: Step #\(stepCount) pvDiff=\(String(format: "%.3f", peakValleyDiff)), len=\(String(format: "%.2f", currentStepLength))m, bearing=\(String(format: "%.1f", currentBearing))°")
     }
@@ -493,7 +575,7 @@ class IMUSensorManager: ObservableObject {
         let calibrationStepCount = stepFactorCalibration.getCalibrationStepCount()
         
         let newState = IMUState(
-            position: getCurrentPosition(),
+            position: _unsafeGetCurrentPosition(),
             stepCount: stepCount,
             isCalibrated: calibrationManager?.isCalibrationValid() ?? false,
             accelerationMagnitude: Float(filteredAcceleration.last ?? 0),

@@ -1,3 +1,4 @@
+
 //
 //  NavigationInputSection.swift
 //  IndoorNavigationTACME
@@ -99,49 +100,62 @@ struct POIDropdownMenu: View {
     @Binding var selectedValue: String
     let placeholder: String
     let options: [String]
-    
+
     @State private var isExpanded = false
     @State private var searchText = ""
     @FocusState private var isSearchFocused: Bool
-    
+    /// Guards against the .onChange(of: selectedValue) loop when the user taps an option
+    @State private var suppressExternalSync = false
+
     private var filteredOptions: [String] {
-        if searchText.isEmpty {
-            return options
-        }
+        if searchText.isEmpty { return options }
         return options.filter { $0.localizedCaseInsensitiveContains(searchText) }
     }
-    
+
+    /// Whether the field currently has a committed selection (not mid-edit)
+    private var hasSelection: Bool {
+        !selectedValue.isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Main button/text field
-            HStack {
-                // Text field for typing/searching
+
+            // ── Input row ──────────────────────────────────────────
+            HStack(spacing: 8) {
+                // Editable text field
                 TextField(placeholder, text: $searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                     .focused($isSearchFocused)
                     .onChange(of: searchText) { newValue in
-                        if !newValue.isEmpty {
+                        // While the user types, keep the dropdown open
+                        if isSearchFocused && !isExpanded {
                             isExpanded = true
                         }
-                        // If exact match found, select it
-                        if options.contains(where: { $0.lowercased() == newValue.lowercased() }) {
-                            selectedValue = options.first(where: { $0.lowercased() == newValue.lowercased() }) ?? newValue
+                        // Auto-select on exact match
+                        if let match = options.first(where: { $0.lowercased() == newValue.lowercased() }) {
+                            suppressExternalSync = true
+                            selectedValue = match
+                            DispatchQueue.main.async { suppressExternalSync = false }
                         }
                     }
-                    .onTapGesture {
-                        isExpanded = true
+
+                // "X" clear button — visible when there is text or a selection
+                if !searchText.isEmpty || hasSelection {
+                    Button(action: clearSelection) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.gray)
+                            .frame(width: 24, height: 24)
                     }
-                
-                // Dropdown arrow button
-                Button(action: {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        isExpanded.toggle()
-                    }
-                }) {
+                    .accessibilityLabel("Clear selection")
+                }
+
+                // Dropdown chevron — always visible
+                Button(action: toggleDropdown) {
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .foregroundColor(.gray)
                         .frame(width: 24, height: 24)
                 }
+                .accessibilityLabel(isExpanded ? "Close dropdown" : "Open dropdown")
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
@@ -151,28 +165,31 @@ struct POIDropdownMenu: View {
                 RoundedRectangle(cornerRadius: 8)
                     .stroke(isExpanded ? Color.blue : Color.gray.opacity(0.3), lineWidth: 1)
             )
-            
-            // Dropdown list
+            // Tapping anywhere on the row opens the dropdown AND focuses the field
+            .contentShape(Rectangle())
+            .onTapGesture {
+                if !isExpanded {
+                    isExpanded = true
+                }
+                isSearchFocused = true
+            }
+
+            // ── Dropdown list ──────────────────────────────────────
             if isExpanded && !filteredOptions.isEmpty {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(filteredOptions, id: \.self) { option in
-                            Button(action: {
-                                selectedValue = option
-                                searchText = option
-                                isExpanded = false
-                                isSearchFocused = false
-                            }) {
+                            Button(action: { selectOption(option) }) {
                                 HStack {
                                     Image(systemName: "mappin")
                                         .foregroundColor(.blue)
                                         .frame(width: 20)
-                                    
+
                                     Text(option)
                                         .foregroundColor(.primary)
-                                    
+
                                     Spacer()
-                                    
+
                                     if option == selectedValue {
                                         Image(systemName: "checkmark")
                                             .foregroundColor(.blue)
@@ -184,7 +201,7 @@ struct POIDropdownMenu: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             .background(option == selectedValue ? Color.blue.opacity(0.1) : Color.clear)
-                            
+
                             if option != filteredOptions.last {
                                 Divider()
                                     .padding(.leading, 44)
@@ -199,14 +216,52 @@ struct POIDropdownMenu: View {
                 .padding(.top, 4)
             }
         }
+        // Open dropdown when field gains focus
+        .onChange(of: isSearchFocused) { focused in
+            if focused && !isExpanded {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isExpanded = true
+                }
+            }
+        }
         .onAppear {
-            // Initialize search text with selected value
             if !selectedValue.isEmpty {
                 searchText = selectedValue
             }
         }
+        // Sync search text when the bound value changes externally
         .onChange(of: selectedValue) { newValue in
+            guard !suppressExternalSync else { return }
             searchText = newValue
+        }
+    }
+
+    // MARK: - Actions
+
+    private func selectOption(_ option: String) {
+        suppressExternalSync = true
+        selectedValue = option
+        searchText = option
+        isExpanded = false
+        isSearchFocused = false
+        DispatchQueue.main.async { suppressExternalSync = false }
+    }
+
+    private func clearSelection() {
+        suppressExternalSync = true
+        selectedValue = ""
+        searchText = ""
+        isExpanded = true          // re-open dropdown so user can pick again
+        isSearchFocused = true     // keep cursor active
+        DispatchQueue.main.async { suppressExternalSync = false }
+    }
+
+    private func toggleDropdown() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            isExpanded.toggle()
+        }
+        if isExpanded {
+            isSearchFocused = true
         }
     }
 }

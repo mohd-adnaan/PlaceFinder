@@ -69,6 +69,9 @@ struct SegmentInfo: Codable {
 }
 
 /// Navigation response from server
+/// NOTE: The server uses MIXED casing — some keys are camelCase (segmentInfo,
+/// pathCoordinates) and others are snake_case (new_map_position, distance_passed).
+/// CodingKeys maps each JSON key to its Swift property name.
 struct NavigationResponse: Codable {
     let status: String
     let message: String?
@@ -89,6 +92,23 @@ struct NavigationResponse: Codable {
     let conversationMode: Bool?
     let conversationData: AnyCodable?
     let segmentInfo: SegmentInfo?
+    
+    enum CodingKeys: String, CodingKey {
+        case status, message, instructions, calibration, waypoint
+        // These keys are already camelCase in the server JSON
+        case navigationStarted, pathCoordinates, pathBearings, segmentInfo
+        // These keys are snake_case in the server JSON
+        case distancePassed = "distance_passed"
+        case returnTurn = "return_turn"
+        case returnAngle = "return_angle"
+        case correctTurn = "correct_turn"
+        case correctAngle = "correct_angle"
+        case deviationType = "deviation_type"
+        case correctionPoint = "correction_point"
+        case newMapPosition = "new_map_position"
+        case conversationMode = "conversation_mode"
+        case conversationData = "conversation_data"
+    }
 }
 
 /// Type-erased Codable wrapper

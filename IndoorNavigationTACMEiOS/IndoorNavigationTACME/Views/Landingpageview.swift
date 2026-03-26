@@ -102,6 +102,9 @@ struct LandingPageView: View {
         .onTapGesture(count: 2) {
             handleDoubleTap()
         }
+        .onTapGesture(count: 1) {
+            handleSingleTap()
+        }
         .onAppear {
             generateParticles()
             startAnimation()
@@ -184,6 +187,12 @@ struct LandingPageView: View {
                         .foregroundColor(.red.opacity(0.8))
                 }
             }
+
+            // Exit hint
+            Text("Tap anywhere to exit")
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.35))
+                .padding(.top, 4)
         }
         .padding()
         .background(Color.white.opacity(0.05))
@@ -294,6 +303,18 @@ struct LandingPageView: View {
 
     // MARK: - Interaction Handlers
 
+    private func handleSingleTap() {
+        // Single tap only acts when a voice navigation session is active
+        let voiceMode: VoiceNavigationManager.InputMode = voiceNavManager.voiceInputState.currentMode
+        guard voiceControlledMode, voiceMode != .idle else { return }
+
+        let generator = UIImpactFeedbackGenerator(style: .light)
+        generator.impactOccurred()
+
+        voiceNavManager.cancelVoiceInput()
+        showBriefFeedback("Voice navigation cancelled")
+    }
+
     private func handleDoubleTap() {
         let generator = UIImpactFeedbackGenerator(style: .medium)
         generator.impactOccurred()
@@ -320,14 +341,9 @@ struct LandingPageView: View {
     }
 
     private func handleVoiceControlledDoubleTap() {
-        // Check voice nav mode using .idle (NOT .none — avoids Optional.none ambiguity)
+        // If voice nav is already active, single tap handles exit — double-tap is a no-op
         let voiceMode: VoiceNavigationManager.InputMode = voiceNavManager.voiceInputState.currentMode
-
-        if voiceMode != .idle {
-            voiceNavManager.cancelVoiceInput()
-            showBriefFeedback("Voice navigation cancelled")
-            return
-        }
+        if voiceMode != .idle { return }
 
         let convActive: Bool = conversationManager.conversationState.isActive
         if convActive {
@@ -343,7 +359,7 @@ struct LandingPageView: View {
         // Start voice navigation flow
         let pois: [String] = navigationManager.poiNames
         voiceNavManager.startVoiceInput(poiNames: pois)
-        showBriefFeedback("Voice navigation started")
+        showBriefFeedback("Voice navigation started — tap to exit")
     }
 
     private func handleVoiceNavigationComplete() {

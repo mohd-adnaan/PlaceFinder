@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  tacme-indoor-navigation:
+    container_name: tacme-indoor-navigation
+    build: 
+      context: .
+    image: tacme-indoor-navigate:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - "./data:/app/data:ro"
+    environment:
+      - GEOJSON_PATH=/app/data/mcgindoornavmerged.geojson
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3

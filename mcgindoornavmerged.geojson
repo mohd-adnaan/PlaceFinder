@@ -1,0 +1,2653 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 1,
+                "name": "411",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    15.141210937497451,
+                    15.36972656250268
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 2,
+                "name": "413",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    21.506249999997465,
+                    15.877734375002689
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 3,
+                "name": "414",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    28.887304687497462,
+                    15.93750000000269
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 4,
+                "name": "room418",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.67714843749745,
+                    15.847851562502681
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 5,
+                "name": "intersectionhall5hall8",
+                "category": "intersection",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    49.386914062497446,
+                    14.682421875002678
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 6,
+                "name": "room433",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    51.777539062497446,
+                    15.45937500000268
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 7,
+                "name": "room434",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    55.93124999999745,
+                    15.369726562502679
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 8,
+                "name": "room435",
+                "category": "lab",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    62.595117187497436,
+                    15.339843750002691
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 9,
+                "name": "room436",
+                "category": "lab",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    75.20566406249743,
+                    15.45937500000269
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 10,
+                "name": "intersectionHall5Hall6",
+                "category": "intersection",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    77.71582031249741,
+                    14.592773437502693
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 11,
+                "name": "stair3",
+                "category": "stair",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    78.07441406249742,
+                    10.050585937502703
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 12,
+                "name": "room426",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    72.57597656249743,
+                    13.696289062502702
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 13,
+                "name": "room427",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    68.21308593749742,
+                    13.696289062502697
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 14,
+                "name": "room428",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    63.93984374999743,
+                    13.696289062502697
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 15,
+                "name": "room429",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    59.54707031249744,
+                    13.636523437502703
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 16,
+                "name": "room430",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    55.243945312497445,
+                    13.606640625002697
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 17,
+                "name": "room431",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    50.940820312497465,
+                    13.546875000002702
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 18,
+                "name": "room432",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    49.147851562497465,
+                    13.546875000002702
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 19,
+                "name": "stair2",
+                "category": "stair",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.61738281249747,
+                    12.949218750002702
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 20,
+                "name": "elevatorentrance1",
+                "category": "elevator",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    33.847851562497475,
+                    9.721875000002692
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 21,
+                "name": "elevatorentrance2",
+                "category": "elevator",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    27.691992187497476,
+                    8.885156250002693
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 22,
+                "name": "hall2",
+                "category": "hallway",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    30.979101562497473,
+                    4.462500000002695
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 23,
+                "name": "room437",
+                "category": "conferenceroom",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    28.976953124997472,
+                    1.384570312502701
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 24,
+                "name": "hall1",
+                "category": "hallway",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    30.919335937497472,
+                    1.474218750002704
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 25,
+                "name": "intersectionhall1hall9",
+                "category": "intersection",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    30.20214843749748,
+                    -10.986914062497291
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 26,
+                "name": "room440",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    23.149804687497483,
+                    -11.106445312497291
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 27,
+                "name": "room442",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    29.335546874997476,
+                    -12.839648437497294
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 28,
+                "name": "hall1node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    30.530859374997473,
+                    -16.18652343749729
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 29,
+                "name": "hall1node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    33.63867187499747,
+                    -16.48535156249729
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 30,
+                "name": "hall1exit",
+                "category": "exit",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    33.63867187499747,
+                    -17.97949218749729
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 31,
+                "name": "room443",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    35.59599609374748,
+                    -15.230273437497313
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 32,
+                "name": "room441",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    23.852050781247492,
+                    -13.168359374997308
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 33,
+                "name": "stair1",
+                "category": "stair",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    20.983300781247493,
+                    13.008984375002642
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 34,
+                "name": "intersectionhall8hall7",
+                "category": "intersection",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    49.61103515624745,
+                    23.169140625002637
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 35,
+                "name": "room419",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    52.21083984374745,
+                    23.946093750002625
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 36,
+                "name": "room420",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    56.18525390624745,
+                    24.00585937500263
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 37,
+                "name": "room421",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    60.63779296874745,
+                    23.975976562502627
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 38,
+                "name": "room422",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    64.94091796874744,
+                    24.00585937500263
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 39,
+                "name": "room423",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    69.42333984374744,
+                    24.035742187502628
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 40,
+                "name": "room424",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    73.57705078124735,
+                    23.856445312502657
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 41,
+                "name": "room425",
+                "category": "office",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    75.54931640624736,
+                    23.856445312502657
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 42,
+                "name": "intersectionHall7Hall6",
+                "category": "intersection",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    78.06554260253641,
+                    23.240579223635457
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 43,
+                "name": "hall3node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    21.497378540036408,
+                    14.395266723635471
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 44,
+                "name": "hall3node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    28.669253540036408,
+                    14.395266723635471
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 45,
+                "name": "hall3node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    41.757925415036404,
+                    14.455032348635473
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 46,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    51.48478088378639,
+                    14.649270629885471
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 47,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    55.6235504150364,
+                    14.544680786135473
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 48,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    59.597964477536394,
+                    14.664212036135472
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 49,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    62.55636291503639,
+                    14.604446411135468
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 50,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    63.96085510253639,
+                    14.604446411135468
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 51,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    68.26398010253642,
+                    14.57456359863547
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 52,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    72.56710510253643,
+                    14.60444641113547
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 53,
+                "name": "hall5node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    75.22667541503642,
+                    14.57456359863547
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 54,
+                "name": "hall6node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    77.15411682128641,
+                    9.972610473635473
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 55,
+                "name": "hall7node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    75.57032775878639,
+                    23.091165161135475
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 56,
+                "name": "hall6node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    73.5681793212864,
+                    23.091165161135475
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 57,
+                "name": "hall7node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    69.41446838378639,
+                    23.150930786135476
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 58,
+                "name": "hall7node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    64.87228088378639,
+                    23.121047973635473
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 59,
+                "name": "hall7node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    60.65880432128639,
+                    23.09116516113547
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 60,
+                "name": "hall7node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    56.17638244628639,
+                    23.24057922363547
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 61,
+                "name": "hall7node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    52.14220275878639,
+                    23.210696411135473
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 62,
+                "name": "hall3node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    33.97345275878639,
+                    14.06655578613547
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 63,
+                "name": "hall2node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    29.78985900878639,
+                    6.536087036135473
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 64,
+                "name": "intersectionhall9",
+                "category": "intersection",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    24.112124633786372,
+                    -11.184420776364524
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 65,
+                "name": "hall1node",
+                "category": "node",
+                "type": "poi"
+            },
+            "geometry": {
+                "type": "Point",
+                "coordinates": [
+                    30.447280883786366,
+                    -12.857858276364528
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 66,
+                "name": "hallway3",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            15.177163696286344,
+                            15.366458129885466
+                        ],
+                        [
+                            21.512319946286347,
+                            14.410208129885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 67,
+                "name": "hallway3",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            21.512319946286347,
+                            14.350442504885466
+                        ],
+                        [
+                            21.034194946286345,
+                            13.035598754885466
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 68,
+                "name": "hallway3",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            21.512319946286347,
+                            14.410208129885467
+                        ],
+                        [
+                            21.512319946286347,
+                            15.904348754885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 69,
+                "name": "hallway3",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            21.512319946286347,
+                            14.469973754885466
+                        ],
+                        [
+                            28.684194946286343,
+                            14.350442504885466
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 70,
+                "name": "hallway3",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            28.684194946286343,
+                            14.410208129885467
+                        ],
+                        [
+                            28.983023071286343,
+                            15.904348754885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 71,
+                "name": "hallway3",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            28.684194946286343,
+                            14.469973754885466
+                        ],
+                        [
+                            34.00333557128634,
+                            14.051614379885466
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 72,
+                "name": "hallway3",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            33.943569946286345,
+                            13.991848754885467
+                        ],
+                        [
+                            41.83263244628634,
+                            14.469973754885466
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 73,
+                "name": "hallway3",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            41.77286682128634,
+                            14.469973754885466
+                        ],
+                        [
+                            41.77286682128634,
+                            15.904348754885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 74,
+                "name": "hallway3",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            41.83263244628634,
+                            14.469973754885466
+                        ],
+                        [
+                            41.65333557128634,
+                            12.975833129885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 75,
+                "name": "hallway3",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            41.83263244628634,
+                            14.469973754885466
+                        ],
+                        [
+                            49.482632446286345,
+                            14.709036254885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 76,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            49.36310119628634,
+                            14.649270629885466
+                        ],
+                        [
+                            51.63419494628634,
+                            14.649270629885466
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 77,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            49.36310119628634,
+                            14.589505004885467
+                        ],
+                        [
+                            49.12403869628634,
+                            13.513723754885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 78,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            51.57442932128634,
+                            14.589505004885467
+                        ],
+                        [
+                            50.97677307128634,
+                            13.394192504885467
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 79,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            51.49972229003633,
+                            14.649270629885473
+                        ],
+                        [
+                            51.79855041503633,
+                            15.456106567385474
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 80,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            51.49972229003638,
+                            14.619387817385476
+                        ],
+                        [
+                            55.62355041503638,
+                            14.499856567385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 81,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            55.62355041503638,
+                            14.499856567385478
+                        ],
+                        [
+                            55.95226135253638,
+                            15.366458129885476
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 82,
+                "name": "halway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            55.62355041503638,
+                            14.529739379885477
+                        ],
+                        [
+                            55.23507385253638,
+                            13.573489379885476
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 83,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            55.62355041503638,
+                            14.529739379885477
+                        ],
+                        [
+                            59.68761291503638,
+                            14.679153442385477
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 84,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            59.62784729003639,
+                            14.679153442385479
+                        ],
+                        [
+                            59.5381988525364,
+                            13.603372192385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 85,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            59.62784729003639,
+                            14.679153442385479
+                        ],
+                        [
+                            62.556362915036395,
+                            14.589505004885478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 86,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            62.556362915036395,
+                            14.589505004885478
+                        ],
+                        [
+                            62.586245727536394,
+                            15.336575317385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 87,
+                "name": "hallway",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            62.556362915036395,
+                            14.619387817385478
+                        ],
+                        [
+                            63.99073791503639,
+                            14.619387817385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 88,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            63.99073791503639,
+                            14.589505004885478
+                        ],
+                        [
+                            68.29386291503639,
+                            14.55962219238548
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 89,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            68.29386291503639,
+                            14.55962219238548
+                        ],
+                        [
+                            72.5969879150364,
+                            14.619387817385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 90,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            72.5969879150364,
+                            14.619387817385478
+                        ],
+                        [
+                            75.2266754150364,
+                            14.589505004885478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 91,
+                "name": "hallway5",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            75.2266754150364,
+                            14.55962219238548
+                        ],
+                        [
+                            77.6770660400364,
+                            14.589505004885478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 92,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            63.96085510253639,
+                            14.589505004885478
+                        ],
+                        [
+                            63.930972290036394,
+                            13.693020629885478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 93,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            68.29386291503639,
+                            14.55962219238548
+                        ],
+                        [
+                            68.23409729003639,
+                            13.693020629885478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 94,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            72.62687072753639,
+                            14.619387817385478
+                        ],
+                        [
+                            72.5969879150364,
+                            13.693020629885478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 95,
+                "name": "hallway5",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            75.2266754150364,
+                            14.55962219238548
+                        ],
+                        [
+                            75.2266754150364,
+                            15.45610656738548
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 96,
+                "name": "hallway6",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            77.19894104003639,
+                            9.95766906738548
+                        ],
+                        [
+                            78.09542541503639,
+                            10.017434692385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 97,
+                "name": "hallway6",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            77.7368316650364,
+                            14.559622192385476
+                        ],
+                        [
+                            77.1391754150364,
+                            9.957669067385478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 98,
+                "name": "hallway8",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            49.4079254150364,
+                            14.679153442385473
+                        ],
+                        [
+                            49.646987915036405,
+                            23.16587219238547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 99,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            49.646987915036405,
+                            23.10610656738547
+                        ],
+                        [
+                            52.15714416503641,
+                            23.225637817385472
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 100,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            52.15714416503641,
+                            23.16587219238547
+                        ],
+                        [
+                            56.16144104003641,
+                            23.225637817385472
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 101,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            56.16144104003641,
+                            23.225637817385472
+                        ],
+                        [
+                            60.703628540036405,
+                            22.986575317385473
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 102,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            60.64386291503641,
+                            23.10610656738547
+                        ],
+                        [
+                            64.9469879150364,
+                            23.16587219238547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 103,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            64.82745666503641,
+                            23.10610656738547
+                        ],
+                        [
+                            69.4294097900364,
+                            23.16587219238547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 104,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            69.54894104003641,
+                            23.16587219238547
+                        ],
+                        [
+                            73.6727691650364,
+                            23.04634094238547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 105,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            73.6727691650364,
+                            22.986575317385473
+                        ],
+                        [
+                            75.6450347900364,
+                            23.04634094238547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 106,
+                "name": "hallway7",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            75.58526916503641,
+                            23.10610656738547
+                        ],
+                        [
+                            78.0954254150364,
+                            23.225637817385472
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 107,
+                "name": "hallway6",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            78.0954254150364,
+                            23.225637817385472
+                        ],
+                        [
+                            77.7965972900364,
+                            14.559622192385472
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 108,
+                "name": "highway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            52.12726135253641,
+                            23.225637817385472
+                        ],
+                        [
+                            52.24679260253641,
+                            24.002590942385474
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 109,
+                "name": "hallway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            56.19132385253641,
+                            23.195755004885473
+                        ],
+                        [
+                            56.221206665036405,
+                            24.06235656738547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 110,
+                "name": "hallway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            60.67374572753641,
+                            23.046340942385473
+                        ],
+                        [
+                            60.67374572753641,
+                            23.972708129885472
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 111,
+                "name": "hallway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            64.85733947753641,
+                            23.106106567385474
+                        ],
+                        [
+                            64.97687072753641,
+                            24.06235656738547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 112,
+                "name": "hallway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            69.45929260253641,
+                            23.16587219238547
+                        ],
+                        [
+                            69.48917541503641,
+                            24.03247375488547
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 113,
+                "name": "hallway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            73.62794494628642,
+                            23.098635864260473
+                        ],
+                        [
+                            73.62794494628642,
+                            23.845706176760473
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 114,
+                "name": "hallway7",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            75.60021057128642,
+                            23.06875305176047
+                        ],
+                        [
+                            75.60021057128642,
+                            23.845706176760473
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 115,
+                "name": "hallway2",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            34.033218383786426,
+                            14.044143676760473
+                        ],
+                        [
+                            33.913687133786425,
+                            9.741018676760476
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 116,
+                "name": "hallway2",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            33.97345275878642,
+                            9.800784301760475
+                        ],
+                        [
+                            29.849624633786426,
+                            6.513674926760475
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 117,
+                "name": "hallway2",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            29.849624633786426,
+                            6.513674926760475
+                        ],
+                        [
+                            30.985171508786426,
+                            4.481643676760477
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 118,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.985171508786426,
+                            4.481643676760476
+                        ],
+                        [
+                            30.955288696286424,
+                            1.463479614260476
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 119,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.92540588378644,
+                            1.463479614260488
+                        ],
+                        [
+                            30.208218383786438,
+                            -11.027536010739512
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 120,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.22315979003644,
+                            -10.98271179198951
+                        ],
+                        [
+                            30.46222229003644,
+                            -12.865328979489512
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 121,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.46222229003644,
+                            -12.850387573239509
+                        ],
+                        [
+                            30.55187072753644,
+                            -16.19726257323951
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 122,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.581753540036434,
+                            -16.19726257323951
+                        ],
+                        [
+                            33.68956604003644,
+                            -16.49609069823951
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 123,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            33.629800415036435,
+                            -16.43632507323951
+                        ],
+                        [
+                            33.68956604003644,
+                            -18.04999694823951
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 124,
+                "name": "hallway9",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.28292541503643,
+                            -10.937887573239509
+                        ],
+                        [
+                            24.186831665036433,
+                            -11.236715698239509
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 125,
+                "name": "hallway9",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            24.127066040036432,
+                            -11.236715698239509
+                        ],
+                        [
+                            23.828237915036432,
+                            -13.20898132323951
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 126,
+                "name": "hallway9",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            24.127066040036436,
+                            -11.17695007323951
+                        ],
+                        [
+                            23.140933227536436,
+                            -11.11718444823951
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 127,
+                "name": "hallway1",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            33.68956604003644,
+                            -16.466207885739518
+                        ],
+                        [
+                            35.661831665036445,
+                            -15.211129760739517
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 128,
+                "name": "hallway1",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.462222290036443,
+                            -12.820504760739519
+                        ],
+                        [
+                            29.356558227536446,
+                            -12.820504760739519
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 129,
+                "name": "hallway1",
+                "type": "path",
+                "category": "doorway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            30.970230102536448,
+                            1.493362426760479
+                        ],
+                        [
+                            28.99796447753645,
+                            1.40371398926048
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 130,
+                "name": "hallway2",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            27.713003540036453,
+                            8.874417114260478
+                        ],
+                        [
+                            29.834683227536452,
+                            6.543557739260478
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 131,
+                "name": "hallway1",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            27.713003540036453,
+                            8.874417114260478
+                        ],
+                        [
+                            33.928628540036456,
+                            9.711135864260479
+                        ]
+                    ]
+                ]
+            }
+        },
+        {
+            "type": "Feature",
+            "properties": {
+                "id": 132,
+                "name": "hallway2",
+                "type": "path",
+                "category": "hallway"
+            },
+            "geometry": {
+                "type": "MultiLineString",
+                "coordinates": [
+                    [
+                        [
+                            28.729019165036455,
+                            14.402737426760478
+                        ],
+                        [
+                            27.683120727536455,
+                            8.904299926760478
+                        ]
+                    ]
+                ]
+            }
+        }
+    ]
+}

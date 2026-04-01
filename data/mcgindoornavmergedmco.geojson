@@ -1,0 +1,5088 @@
+{
+  "type": "FeatureCollection",
+  "name": "MergedMcC",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 1,
+        "type": "poi",
+        "category": "stairs",
+        "name": "upstairs1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.535628681890167,
+          17.17898248665334
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 2,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.68189269649737,
+          14.497475552187867
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 3,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "doubledoorentrance3",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.244159119710577,
+          8.841933654042503
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 4,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.48687401035443,
+          8.939442997113975
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 5,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "buildingentrance3",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.14453284256945,
+          8.841933654042503
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 6,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.3872477332133,
+          8.841933654042503
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 7,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.43494393771421,
+          8.74442431097103
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 8,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.897584083786285,
+          8.74442431097103
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 9,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.484757076284772,
+          6.306690734184237
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 10,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.337434594642737,
+          6.501709420327181
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 11,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.289738390141828,
+          14.497475552187867
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 12,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.337434594642737,
+          14.399966209116394
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 13,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "doubledoorentrance1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.634196491996466,
+          3.625183799718762
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 14,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.291855324211486,
+          3.52767445664729
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 15,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "buildingentrance1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.04702349949798,
+          3.625183799718762
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 16,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.337434594642737,
+          3.430165113575818
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 17,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.582266419356245,
+          3.430165113575818
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 18,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "exittomacdonaldbuilding",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.48687401035443,
+          -1.518434047301369
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 19,
+        "type": "poi",
+        "category": "classroom12",
+        "name": "room12",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          45.19171611053634,
+          26.820218782845103
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 20,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "doubledoorentry2",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.36871206965032,
+          6.096817109057901
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 21,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          17.31889893107968,
+          6.066345439348068
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 22,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "buildingentrance2",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.171576449437573,
+          6.127288778767736
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 23,
+        "type": "poi",
+        "category": "amenity",
+        "name": "eusmall",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          15.003052033132322,
+          14.537469618681857
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 24,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.467809113274154,
+          14.659356297521192
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 25,
+        "type": "poi",
+        "category": "shop",
+        "name": "frostbit",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.516563784809886,
+          16.414524472807617
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 26,
+        "type": "poi",
+        "category": "store",
+        "name": "generalstore",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.93362466045089,
+          14.586224290217592
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 27,
+        "type": "poi",
+        "category": "waitingarea",
+        "name": "waitingarea",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          3.813854915681362,
+          18.145315312326186
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 28,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.055511339290222,
+          18.19406998386192
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 29,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.055511339290222,
+          21.728783670202635
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 30,
+        "type": "poi",
+        "category": "wastebins",
+        "name": "plasticbins",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.591283492665843,
+          21.728783670202635
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 31,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.153020682361689,
+          25.165988013471885
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 32,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.128643346593822,
+          26.860212849338645
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 33,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.638979697166672,
+          25.251308688659424
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 34,
+        "type": "poi",
+        "category": "room",
+        "name": "undergraduateengineeringsociety",
+        "name_alt": "room7",
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.128643346593822,
+          28.12783430926773
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 35,
+        "type": "poi",
+        "category": "room",
+        "name": "euscopieus",
+        "name_alt": null,
+        "desc": "room6mcconnel"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          7.031663237039807,
+          26.811458177802912
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 36,
+        "type": "poi",
+        "category": "room",
+        "name": "room8eus",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.634408946710197,
+          27.774362940633647
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 37,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          11.622220278826264,
+          27.140552210669107
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 38,
+        "type": "poi",
+        "category": "room",
+        "name": "eusstorageoffice",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          12.41448369128194,
+          27.140552210669107
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 39,
+        "type": "poi",
+        "category": "room",
+        "name": "room5",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.148321697771483,
+          23.82523454623918
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 40,
+        "type": "poi",
+        "category": "medals",
+        "name": "glassmedalspoint",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.876594603836507,
+          26.35438313215538
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 41,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.15746319868443,
+          25.233025686833496
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 42,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "eusmallentrance",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          14.913160607488308,
+          25.257403022601366
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 43,
+        "type": "poi",
+        "category": "classroom",
+        "name": "classroom10",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.66422314876884,
+          26.80536384386091
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 44,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          18.712977820304573,
+          25.44023304086036
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 45,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          20.017165283885458,
+          25.391478369324616
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 46,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.162370831457753,
+          25.488987712396085
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 47,
+        "type": "poi",
+        "category": "amenity",
+        "name": "waterfountain1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.84652393351039,
+          26.19593044966423
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 48,
+        "type": "poi",
+        "category": "amenity",
+        "name": "waterfountain",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.064861488386285,
+          26.19593044966423
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 49,
+        "type": "poi",
+        "category": "stairs",
+        "name": "upstairstoclassroom",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.94801067645401,
+          27.207589884030718
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 50,
+        "type": "poi",
+        "category": "classroom",
+        "name": "classroom11",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.069897355293346,
+          28.914003387781406
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 51,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.021142683757613,
+          25.403667037208557
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 52,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.996765347989744,
+          22.35650006622518
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 53,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.14302936259695,
+          19.772502474831278
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 54,
+        "type": "poi",
+        "category": "elevator",
+        "name": "elevator1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.241597172703322,
+          22.332122730457314
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 55,
+        "type": "poi",
+        "category": "elevator",
+        "name": "elevator2",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          22.119710493863987,
+          19.772502474831278
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 56,
+        "type": "poi",
+        "category": "elevator",
+        "name": "elevator3",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.945364508866746,
+          22.35650006622518
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 57,
+        "type": "poi",
+        "category": "elevator",
+        "name": "elevator4",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.16476053077755,
+          19.74812513906341
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 58,
+        "type": "poi",
+        "category": "elevator",
+        "name": "elevator5",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.19178403413268,
+          17.517598916303584
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 59,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "entrance1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          19.218807537487812,
+          14.555752620507745
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 60,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.53306673488282,
+          14.36073393436481
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 61,
+        "type": "poi",
+        "category": "cafe",
+        "name": "cafeteria",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          28.04340308545567,
+          14.068205905150403
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 62,
+        "type": "poi",
+        "category": "pillars",
+        "name": "pillars1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.28929337720415,
+          12.824961780989188
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 63,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.728085421025757,
+          12.800584445221322
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 64,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.801217428329355,
+          11.045416269934897
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 65,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.89608060381356,
+          11.09417094147063
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 66,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.874349435632958,
+          6.681873167486705
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 67,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.971858778704426,
+          5.58489305793269
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 68,
+        "type": "poi",
+        "category": "pillar",
+        "name": "pillars2",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          24.411180056043484,
+          5.58489305793269
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 69,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          25.16687746484736,
+          3.488442181896128
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 70,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27.970271078152066,
+          3.427498842476461
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 71,
+        "type": "poi",
+        "category": "dinobisant",
+        "name": "dinobisant",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          21.510277099667313,
+          2.208632054083111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 72,
+        "type": "poi",
+        "category": "wastebins",
+        "name": "wastebins",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          23.484841296864538,
+          2.403650740226047
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 73,
+        "type": "poi",
+        "category": "fountains",
+        "name": "fountains",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27.994648413919933,
+          2.208632054083111
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 74,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.920457939581425,
+          3.378744170940727
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 75,
+        "type": "poi",
+        "category": "bank",
+        "name": "atmcibcbank",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          30.871174034528238,
+          3.427498842476461
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 76,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.89608060381356,
+          5.158289681995018
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 77,
+        "type": "poi",
+        "category": "vendingmachine",
+        "name": "snacksvendingmachine",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          31.212456735278376,
+          5.109535010459283
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 78,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.847325932277823,
+          7.193797218611912
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 79,
+        "type": "poi",
+        "category": "downstairs",
+        "name": "downstairs1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.285059509064524,
+          7.096287875540443
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 80,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          29.85646743319078,
+          8.571116689496396
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 81,
+        "type": "poi",
+        "category": "stairs",
+        "name": "upstairs2",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          33.211398268243485,
+          8.52845635190263
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 82,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          36.397592232277994,
+          8.555499958770106
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 83,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          36.42806390198783,
+          6.946595798090823
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 84,
+        "type": "poi",
+        "category": "fountain",
+        "name": "waterfountain3",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          35.30670645666591,
+          6.934407130206888
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 85,
+        "type": "poi",
+        "category": "cafe",
+        "name": "engineeringcafeentrance",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          38.14666607362252,
+          6.885652458671153
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 86,
+        "type": "poi",
+        "category": "room",
+        "name": "room116c",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          36.37321489651013,
+          5.697257339987591
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 87,
+        "type": "poi",
+        "category": "elevator",
+        "name": "disabledaccessibleelevator",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.03404912982964,
+          11.00542220344083
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 88,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27.48767600912227,
+          25.351484302831103
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 89,
+        "type": "poi",
+        "category": "bins",
+        "name": "trashbins",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          27.4632986733544,
+          26.619105762760235
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 90,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "engineeringexitstairs",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          33.94766998760726,
+          23.84008948522328
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 91,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          33.94766998760726,
+          25.278352295527487
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 92,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          37.177666976849764,
+          24.8883149232416
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 93,
+        "type": "poi",
+        "category": "classroom",
+        "name": "room11",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          37.226421648385504,
+          26.960388463510373
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 94,
+        "type": "poi",
+        "category": "amenity",
+        "name": "studyarea1",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.103476502511334,
+          20.744167842704048
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 95,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          38.90845781636839,
+          24.742050908634386
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 96,
+        "type": "poi",
+        "category": "classroom",
+        "name": "classroom12",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          38.81094847329692,
+          27.082275142349708
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 97,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          42.321284823869895,
+          24.449522879419973
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 98,
+        "type": "poi",
+        "category": "bins",
+        "name": "wastecollectionpoint",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          42.321284823869895,
+          26.838501784671028
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 99,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          45.149055772942575,
+          23.91322149252688
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 100,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          49.34195752501586,
+          22.93812806181216
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 101,
+        "type": "poi",
+        "category": "stairs",
+        "name": "upstairs3",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          49.220070846176526,
+          25.278352295527476
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 102,
+        "type": "poi",
+        "category": "classroom",
+        "name": "classroom13",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          50.170786941123374,
+          26.369238071139563
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 103,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          49.24444818194439,
+          26.332672067487763
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 104,
+        "type": "poi",
+        "category": "amenity",
+        "name": "studyarea2",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          52.102690800726904,
+          24.236221191451122
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 105,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          52.00518145765543,
+          22.70044903807544
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 106,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          54.93046174979958,
+          22.578562359236102
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 107,
+        "type": "poi",
+        "category": "amenity",
+        "name": "studyarea3",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          55.027971092871056,
+          20.823394183949613
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 108,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          63.718491294115964,
+          22.529807687700366
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 109,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          66.20497954243848,
+          22.627317030771838
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 110,
+        "type": "poi",
+        "category": "classroom",
+        "name": "room13",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          63.547849943740886,
+          24.96754126448716
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 111,
+        "type": "poi",
+        "category": "bins",
+        "name": "plasticbinsarea",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          67.47260100236761,
+          22.627317030771838
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 112,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          66.35124355704569,
+          25.333201301005175
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 113,
+        "type": "poi",
+        "category": "exitentrypoint",
+        "name": "exittofrankdawsonadam",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          68.25267574693942,
+          28.319424932568996
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 114,
+        "type": "poi",
+        "category": "stairs",
+        "name": "upanddownstairs",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          66.4487529001172,
+          29.53829172096239
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 115,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          66.49750757165293,
+          28.221915589497524
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 116,
+        "type": "poi",
+        "category": "node",
+        "name": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.954277258083234,
+          25.199125954281897
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 117,
+        "type": "poi",
+        "category": "pillars",
+        "name": "pillars",
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          9.954277258083234,
+          26.271728728068087
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 118,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              9.966465925967169,
+              26.222974056532355
+            ],
+            [
+              9.966465925967169,
+              25.186937286397967
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 119,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              19.29079685717666,
+              8.793178982506767
+            ],
+            [
+              21.289738390141828,
+              8.793178982506767
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 120,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              21.289738390141828,
+              8.890688325578239
+            ],
+            [
+              21.3872477332133,
+              6.355445405719973
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 121,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              21.3872477332133,
+              8.793178982506767
+            ],
+            [
+              21.289738390141828,
+              14.497475552187867
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 122,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              21.289738390141828,
+              8.74442431097103
+            ],
+            [
+              23.239925251571265,
+              8.74442431097103
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 123,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.38618926617847,
+              6.452954748791445
+            ],
+            [
+              23.337434594642737,
+              8.890688325578239
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 124,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.337434594642737,
+              8.841933654042503
+            ],
+            [
+              23.142415908499792,
+              14.44872088065213
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 125,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              19.04702349949798,
+              3.52767445664729
+            ],
+            [
+              21.43600240474904,
+              3.478919785111554
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 126,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              21.533511747820505,
+              3.52767445664729
+            ],
+            [
+              23.43494393771421,
+              3.478919785111554
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 127,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.43494393771421,
+              3.52767445664729
+            ],
+            [
+              25.1901121130007,
+              3.52767445664729
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 128,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              15.244159119710577,
+              3.576429128183026
+            ],
+            [
+              18.998268827962242,
+              3.52767445664729
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 129,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              15.244159119710577,
+              8.841933654042503
+            ],
+            [
+              19.14453284256945,
+              8.841933654042503
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 130,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              17.38936466728296,
+              6.062917376505558
+            ],
+            [
+              17.38936466728296,
+              8.939442997113975
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 131,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              17.38936466728296,
+              8.890688325578239
+            ],
+            [
+              17.584383353425903,
+              14.546230223723603
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 132,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              17.48687401035443,
+              14.44872088065213
+            ],
+            [
+              17.48687401035443,
+              17.17898248665334
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 133,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.337434594642737,
+              8.695669639435295
+            ],
+            [
+              24.897584083786285,
+              8.74442431097103
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 134,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              15.370840249757087,
+              6.091657884556787
+            ],
+            [
+              19.295388624563987,
+              6.053921842491336
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 135,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              17.295378395095085,
+              6.091657884556787
+            ],
+            [
+              17.37085047922599,
+              -1.493286570598855
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 136,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              15.10668795529893,
+              14.431323181021448
+            ],
+            [
+              17.40858652129144,
+              14.469059223086898
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 137,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              14.955743787037127,
+              14.563399328250526
+            ],
+            [
+              12.465165010717364,
+              14.56339932825052
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 138,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              12.446296989684637,
+              14.56339932825052
+            ],
+            [
+              12.484033031750087,
+              16.412465389457616
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 139,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              12.484033031750092,
+              14.714343496512333
+            ],
+            [
+              7.880235899765076,
+              14.63887141238143
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 140,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              7.955707983895978,
+              14.60113537031598
+            ],
+            [
+              8.031180068026881,
+              18.148323324468368
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 141,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              7.955707983895978,
+              18.18605936653382
+            ],
+            [
+              3.917951482892726,
+              18.072851240337467
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 142,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.03118006802688,
+              18.167191345501102
+            ],
+            [
+              8.068916110092331,
+              21.770983362751668
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 143,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.106652152157782,
+              21.75211534171894
+            ],
+            [
+              9.578357792710369,
+              21.733247320686218
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 144,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.078350120608693,
+              21.75211534171894
+            ],
+            [
+              8.13495418370687,
+              25.204963190707705
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 145,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.13495418370687,
+              25.186095169674978
+            ],
+            [
+              8.13495418370687,
+              26.884217062620273
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 146,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.116086162674147,
+              26.888934067878434
+            ],
+            [
+              6.965136879677894,
+              26.870066046845707
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 147,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.134954183706874,
+              26.917236099427523
+            ],
+            [
+              8.134954183706874,
+              28.12478944552195
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 148,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              8.134954183706874,
+              25.181378164416778
+            ],
+            [
+              11.587802032695636,
+              25.200246185449505
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 149,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              11.587802032695636,
+              25.200246185449505
+            ],
+            [
+              11.606670053728362,
+              27.747429024867444
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 150,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              11.644406095793812,
+              27.14365235182023
+            ],
+            [
+              12.361390895037381,
+              27.14365235182023
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 151,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              11.606670053728362,
+              25.200246185449505
+            ],
+            [
+              14.021776745917222,
+              25.237982227514955
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 152,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              14.1538528931463,
+              25.200246185449505
+            ],
+            [
+              14.134984872113575,
+              23.822880650060544
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 153,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              14.11611685108085,
+              25.219114206482228
+            ],
+            [
+              15.078385923749849,
+              25.219114206482228
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 154,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              14.87083769238987,
+              25.200246185449505
+            ],
+            [
+              14.87083769238987,
+              26.332327447413032
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 155,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              15.078385923749849,
+              25.219114206482228
+            ],
+            [
+              18.719913983065865,
+              25.42666243784221
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 156,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              18.70104596203314,
+              25.46439847990766
+            ],
+            [
+              18.682177941000415,
+              26.822895994263895
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 157,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              18.738782004098592,
+              25.407794416809484
+            ],
+            [
+              20.021807434323925,
+              25.370058374744033
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 158,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              19.94633535019302,
+              25.407794416809484
+            ],
+            [
+              19.94633535019302,
+              26.068175152954876
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 159,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              19.927467329160297,
+              25.407794416809484
+            ],
+            [
+              22.09728974792373,
+              25.445530458874934
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 160,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              22.09728974792373,
+              25.445530458874934
+            ],
+            [
+              22.09728974792373,
+              26.04930713192215
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 161,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              22.097289747923732,
+              25.40779441680949
+            ],
+            [
+              23.984091851196283,
+              25.40779441680949
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 162,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.984091851196283,
+              25.37005837474404
+            ],
+            [
+              23.94635580913083,
+              27.294596520082038
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 163,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.02182789326173,
+              27.256860478016588
+            ],
+            [
+              24.02182789326173,
+              28.95498237096188
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 164,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.984091851196283,
+              25.37005837474404
+            ],
+            [
+              24.02182789326173,
+              22.27570292537706
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 165,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.059563935327184,
+              22.351175009507962
+            ],
+            [
+              22.248233916185534,
+              22.31343896744251
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 166,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.984091851196283,
+              22.33230698847524
+            ],
+            [
+              28.625625025246748,
+              22.33230698847524
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 167,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.021827893261733,
+              22.256834904344338
+            ],
+            [
+              24.097299977392634,
+              19.766256128024573
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 168,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.097299977392634,
+              19.766256128024573
+            ],
+            [
+              29.304873782424863,
+              19.803992170090027
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 169,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.135036019458084,
+              19.803992170090027
+            ],
+            [
+              21.94634557966193,
+              19.803992170090027
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 170,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.135036019458084,
+              19.728520085959122
+            ],
+            [
+              24.172772061523535,
+              17.577565688228418
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 171,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.172772061523535,
+              17.577565688228418
+            ],
+            [
+              22.05955370585828,
+              17.634169751326596
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 172,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              17.455756573873266,
+              14.464342217828717
+            ],
+            [
+              19.22935055094946,
+              14.50207825989417
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 173,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              19.22935055094946,
+              14.483210238861444
+            ],
+            [
+              24.436924355981688,
+              14.370002112665091
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 174,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.17277206152353,
+              17.50209360409752
+            ],
+            [
+              24.474660398047142,
+              14.256793986468738
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 175,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.587868524243497,
+              14.29453002853419
+            ],
+            [
+              27.98411231013408,
+              14.105849818206934
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 176,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.474660398047142,
+              14.332266070599642
+            ],
+            [
+              24.7388126925053,
+              12.747352303850702
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 177,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.870883724999928,
+              12.841692409014325
+            ],
+            [
+              24.8142847766362,
+              12.766220324883424
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 178,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.701076650439845,
+              12.80395636694888
+            ],
+            [
+              24.927492902832554,
+              5.520900248316845
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 179,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              25.078437071094356,
+              5.520900248316845
+            ],
+            [
+              24.248244145654432,
+              5.558636290382296
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 180,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              19.135010445785827,
+              6.124676921364063
+            ],
+            [
+              24.908624881799827,
+              6.652981510280377
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 181,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              21.436909011778337,
+              6.351093173756771
+            ],
+            [
+              21.436909011778337,
+              4.69070732287693
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 182,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              21.455777032811064,
+              4.652971280811478
+            ],
+            [
+              21.474645053843787,
+              2.256732609655343
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 183,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.399183199181785,
+              2.426544798949873
+            ],
+            [
+              23.361447157116338,
+              3.86051439743701
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 184,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              23.361447157116338,
+              3.671834187109755
+            ],
+            [
+              23.285975072985437,
+              6.502037342018577
+            ],
+            [
+              23.248239030919983,
+              6.502037342018577
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 185,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.99353097644709,
+              5.44542816418595
+            ],
+            [
+              25.069003060577995,
+              3.445417934717049
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 186,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              25.106739102643445,
+              3.445417934717049
+            ],
+            [
+              27.899206215486814,
+              3.407681892651598
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 187,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              27.974678299617718,
+              3.369945850586147
+            ],
+            [
+              27.974678299617718,
+              2.237864588622619
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 188,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              28.08788642581407,
+              3.407681892651598
+            ],
+            [
+              30.842617496591988,
+              3.407681892651598
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 189,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.899216444955716,
+              3.445417934717049
+            ],
+            [
+              29.861480402890265,
+              5.06806774353144
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 190,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.974688529086617,
+              5.143539827662342
+            ],
+            [
+              31.18224187518105,
+              5.143539827662342
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 191,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.78600831875936,
+              5.124671806629614
+            ],
+            [
+              29.823744360824815,
+              7.200154120229416
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 192,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.823744360824815,
+              7.200154120229416
+            ],
+            [
+              32.20111501094823,
+              7.086945994033063
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 193,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.823744360824815,
+              7.200154120229416
+            ],
+            [
+              29.823744360824815,
+              9.31337247589467
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 194,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.823744360824815,
+              9.332240496927398
+            ],
+            [
+              29.823744360824815,
+              11.143570516069044
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 195,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.78600831875936,
+              11.105834474003593
+            ],
+            [
+              32.05017084268642,
+              10.992626347807239
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 196,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.899216444955716,
+              11.105834474003593
+            ],
+            [
+              24.767114724054387,
+              10.992626347807239
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 197,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              29.795442329275723,
+              8.577519655618381
+            ],
+            [
+              33.191686115166306,
+              8.53978361355293
+            ],
+            [
+              33.191686115166306,
+              8.615255697683832
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 198,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              36.39924969072964,
+              8.577519655618381
+            ],
+            [
+              36.361513648664186,
+              6.954869846803989
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 199,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              36.361513648664186,
+              6.954869846803989
+            ],
+            [
+              35.26716842876611,
+              6.954869846803989
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 200,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              36.361513648664186,
+              6.99260588886944
+            ],
+            [
+              36.32377760659874,
+              5.709580458644107
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 201,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              36.47472177486054,
+              6.99260588886944
+            ],
+            [
+              38.13510762574039,
+              6.879397762673087
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 202,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              24.021827893261737,
+              25.407794416809498
+            ],
+            [
+              33.946406956475336,
+              25.256850248547693
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 203,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              33.90867091440988,
+              25.256850248547693
+            ],
+            [
+              33.98414299854079,
+              23.822880650060558
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 204,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              27.493543763283224,
+              25.332322332678597
+            ],
+            [
+              27.493543763283224,
+              26.61534776290393
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 205,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              33.98414299854079,
+              25.256850248547693
+            ],
+            [
+              37.116234489973216,
+              24.879489827893185
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 206,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              37.15397053203867,
+              24.879489827893185
+            ],
+            [
+              37.22944261616957,
+              26.992708183558438
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 207,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              37.15397053203867,
+              24.95496191202409
+            ],
+            [
+              38.81435638291851,
+              24.766281701696833
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 208,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              38.77662034085306,
+              24.766281701696833
+            ],
+            [
+              38.73888429878761,
+              26.992708183558438
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 209,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              38.77662034085306,
+              24.72854565963138
+            ],
+            [
+              39.00303659324577,
+              20.728525200693582
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 210,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              38.88982846704941,
+              24.72854565963138
+            ],
+            [
+              42.05965600054729,
+              24.426657323107776
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 211,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              42.17286412674365,
+              24.38892128104232
+            ],
+            [
+              42.13512808467819,
+              26.841764015296633
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 212,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              42.210600168809094,
+              24.38892128104232
+            ],
+            [
+              45.15401144991427,
+              23.785144607995107
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 213,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              45.15401144991427,
+              23.747408565929657
+            ],
+            [
+              45.15401144991427,
+              26.766291931165732
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 214,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              45.30495561817607,
+              23.671936481798753
+            ],
+            [
+              49.154031908852076,
+              22.879479598424282
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 215,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              49.22950399298297,
+              22.841743556358836
+            ],
+            [
+              49.22950399298297,
+              25.18137816441679
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 216,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              49.267240035048424,
+              25.256850248547693
+            ],
+            [
+              49.154031908852076,
+              26.577611720838476
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 217,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              49.267240035048424,
+              26.351195468445773
+            ],
+            [
+              50.210641086684696,
+              26.388931510511224
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 218,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              49.19176795091752,
+              22.841743556358836
+            ],
+            [
+              51.98423506376089,
+              22.69079938809703
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 219,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              51.98423506376089,
+              22.615327303966126
+            ],
+            [
+              52.021971105826346,
+              24.200241070715066
+            ],
+            [
+              52.09744318995725,
+              24.27571315484597
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 220,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              51.98423506376089,
+              22.72853543016248
+            ],
+            [
+              54.814438218669714,
+              22.615327303966126
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 221,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              54.92764634486607,
+              22.57759126190068
+            ],
+            [
+              54.965382386931516,
+              20.803997284824483
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 222,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              54.984250407964254,
+              22.615327303966126
+            ],
+            [
+              63.58806799888707,
+              22.577591261900672
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 223,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              63.625804040952524,
+              22.577591261900672
+            ],
+            [
+              63.58806799888707,
+              24.954961912024082
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 224,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              63.81448425127978,
+              22.577591261900672
+            ],
+            [
+              65.92770260694503,
+              22.615327303966126
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 225,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              66.30506302759954,
+              22.53985521983522
+            ],
+            [
+              67.51261637369397,
+              22.615327303966126
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 226,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              66.19185490140319,
+              22.615327303966126
+            ],
+            [
+              66.22959094346864,
+              25.332322332678594
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 227,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              66.26732698553408,
+              25.332322332678594
+            ],
+            [
+              66.38053511173044,
+              28.351205697914672
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 228,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              66.4182711537959,
+              28.237997571718317
+            ],
+            [
+              68.19186513087209,
+              28.27573361378377
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 229,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": "stairs"
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              32.46065250576733,
+              7.086765478756062
+            ],
+            [
+              35.30061212272394,
+              6.928312796264921
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 230,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              33.228538582455165,
+              8.52502828906027
+            ],
+            [
+              36.40978090016193,
+              8.573782960596006
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": 231,
+        "type": "path",
+        "name": null,
+        "category": null,
+        "name_alt": null,
+        "desc": null
+      },
+      "geometry": {
+        "type": "MultiLineString",
+        "coordinates": [
+          [
+            [
+              66.39999822858147,
+              28.27067026103326
+            ],
+            [
+              66.4487529001172,
+              29.587046392498127
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

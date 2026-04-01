@@ -47,6 +47,7 @@ playground.xcworkspace
 # api Keys 
 IndoorNavigationTACMEiOS/**/Config.xcconfig
 IndoorNavigationTACMEiOS/IndoorNavigationTACME/Config.xcconfig
+IndoorNavigationTACMEiOS/IndoorNavigationTACME/Info.plist
 
 # Keys
 **/Config.xcconfig

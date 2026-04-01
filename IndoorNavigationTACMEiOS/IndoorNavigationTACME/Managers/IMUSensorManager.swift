@@ -46,28 +46,40 @@ class IMUSensorManager: ObservableObject {
     private var pendingStepCandidateTime: Date?
     
     // Peak-valley detection
-    // FIX: iOS userAcceleration has gravity removed, so the unsigned magnitude
-    // barely oscillates during walking (std ~0.02). We now use SIGNED vertical
-    // projection (dot product with gravity vector) which gives a clean oscillation
-    // of ~±0.1 during walking. Thresholds are calibrated from real iOS CSV data.
+    // Uses SIGNED vertical projection (dot product with gravity vector) which gives
+    // a clean oscillation of ~±0.1-0.3 during walking.
     private var lastPeak: Double = 0
     private var lastValley: Double = 0
     private var lastPeakTime: TimeInterval = 0
-    private let stepPeakThreshold: Double = 0.025
+    // FIX: Raised from 0.025 → 0.12. The old threshold was far too low —
+    // light phone shaking produces pvDiffs of 0.09-0.18 which all passed through.
+    // Real walking pvDiffs are consistently 0.25-0.73. Setting to 0.12 provides
+    // margin for gentle walking while rejecting shaking/tremor.
+    private let stepPeakThreshold: Double = 0.12
     
-    // FIX: Absolute minimum amplitude for peaks/valleys.
-    // The adaptive thresholds (mean ± std) collapse to near-zero during standstill
-    // because the bandpass-filtered signal is centered at zero. This means hand
-    // tremor of ±0.04 exceeds the adaptive threshold (≈0.02) and gets classified
-    // as peaks/valleys, generating ghost steps. These absolute minimums ensure
-    // only genuine walking oscillations (peaks ≈ 0.08-0.3) trigger detection.
-    // Walking data shows: peaks consistently > 0.06, valleys consistently < -0.03.
-    // Hand tremor: peaks < 0.05, valleys > -0.05.
-    private let absoluteMinPeakAmplitude: Double = 0.06
-    private let absoluteMinValleyAmplitude: Double = -0.03
+    // FIX: Raised absolute amplitude floors.
+    // Old values (peak=0.06, valley=-0.03) allowed hand tremor (±0.05-0.10) through.
+    // Walking peaks are consistently >0.10, valleys consistently < -0.06.
+    private let absoluteMinPeakAmplitude: Double = 0.08
+    private let absoluteMinValleyAmplitude: Double = -0.05
     // Maximum age (seconds) for a peak to be used in pvDiff calculation.
     // Prevents stale peaks from walking contaminating standstill detection.
     private let maxPeakAge: TimeInterval = 2.0
+    
+    // FIX: Ported from Android — Similarity constraint.
+    // After 6+ confirmed steps, rejects new peaks whose magnitude deviates
+    // more than 3σ from the running average of confirmed step peaks.
+    // This makes step detection adaptive to the user's walking intensity.
+    private var confirmedStepPeakMagnitudes: [Double] = []
+    private let similarityMinSteps = 6
+    private let similarityMaxDeviations: Double = 3.0
+    private let similarityMaxHistory = 20
+    
+    // FIX: Ported from Android — Continuity constraint.
+    // Requires 4 out of the last 7 variance windows to be "active" (above threshold),
+    // ensuring continuous walking motion rather than a one-off shake.
+    private let continuityWindowSize = 7
+    private let continuityThreshold = 4
     
     // Real Butterworth bandpass filter (SAME COEFFICIENTS AS ANDROID)
     private let butterworthFilter = ButterworthBandpassFilter()
@@ -93,10 +105,9 @@ class IMUSensorManager: ObservableObject {
     // Step timing constraints
     private let minStepPeriod: TimeInterval = 0.3
     private let maxStepPeriod: TimeInterval = 1.2
-    // Raised from 0.4 to 0.6: at 0.4 the gate was too weak — pvDiffs of 0.04-0.06
-    // from phone vibration/settling passed through as ghost steps. At 0.6, the
-    // elevated threshold becomes 0.025 * 1.8 = 0.045, which rejects most standstill
-    // noise while still passing genuine walking steps (pvDiff > 0.1 typically).
+    // Stationary variance gate: when recent variance indicates standstill,
+    // require pvDiff to exceed stepPeakThreshold * 2.0 (i.e. 0.24).
+    // This is a secondary soft gate; the primary hard gate is the continuity constraint.
     private let stationaryVarianceGateMultiplier: Double = 0.6
     
     // Acceleration logging
@@ -164,6 +175,7 @@ class IMUSensorManager: ObservableObject {
             accelerationTimestamps.removeAll()
             accelerationVariances.removeAll()
             detectedPeaks.removeAll()
+            confirmedStepPeakMagnitudes.removeAll()
             recentStepPeriods.removeAll()
             lastStepTime = nil
             pendingStepCandidateTime = nil
@@ -384,10 +396,8 @@ class IMUSensorManager: ObservableObject {
         let previous = filteredAcceleration[n - 2]
         let beforePrevious = filteredAcceleration[n - 3]
         
-        // Peak detection: previous is a local maximum above BOTH the dynamic upper
-        // threshold AND the absolute minimum amplitude. The absolute minimum prevents
-        // hand tremor (±0.04) from being classified as peaks when the adaptive threshold
-        // collapses to ~0.02 during standstill.
+        // Peak detection: local maximum above BOTH the dynamic upper threshold
+        // AND the absolute minimum amplitude (rejects hand tremor at standstill).
         if previous > beforePrevious &&
            previous > current &&
            previous > upperThreshold &&
@@ -398,19 +408,17 @@ class IMUSensorManager: ObservableObject {
             accelerationLogger.markLastSampleAsPeak()
         }
         
-        // Valley detection: previous is a local minimum below BOTH thresholds (after a peak)
+        // Valley detection: local minimum below BOTH thresholds (after a peak)
         if previous < beforePrevious &&
            previous < current &&
            previous < lowerThreshold &&
            previous < absoluteMinValleyAmplitude &&
            lastPeakTime > 0 {
             
-            // Reject if the peak is stale (from a previous walking burst).
-            // Without this, a walking peak of +0.2 persists, and when a tiny valley
-            // of -0.03 is detected during standstill, pvDiff = 0.23 → ghost step.
+            // Reject stale peaks from a previous walking burst
             let peakAge = timestamp - lastPeakTime
             guard peakAge <= maxPeakAge else {
-                lastPeakTime = 0 // Invalidate stale peak
+                lastPeakTime = 0
                 return
             }
             
@@ -418,15 +426,37 @@ class IMUSensorManager: ObservableObject {
             let peakValleyDiff = lastPeak - lastValley
             accelerationLogger.markLastSampleAsValley()
             
-            if peakValleyDiff > stepPeakThreshold {
+            // FIX: Use the HIGHER of the base threshold and the adaptive calibrated threshold.
+            // After calibration, the system learns the user's typical pvDiff and uses 25% of
+            // the average as a floor — this makes step detection adapt to the user's walking
+            // pattern and rejects movements that are too weak relative to their normal gait.
+            let adaptiveThreshold = stepFactorCalibration.getAdaptivePvDiffThreshold()
+            let effectiveThreshold = max(stepPeakThreshold, adaptiveThreshold)
+            
+            if peakValleyDiff > effectiveThreshold {
                 let currentDate = Date()
+                
+                // Soft gate: raise threshold further when stationary
                 let recentVariance = accelerationVariances.suffix(5).reduce(0, +) /
                     Double(max(accelerationVariances.suffix(5).count, 1))
                 let isStationary = recentVariance < (varianceThreshold * stationaryVarianceGateMultiplier)
-
-                // Reject weak peaks when recent motion variance indicates stationary behavior.
-                if isStationary && peakValleyDiff < (stepPeakThreshold * 1.8) {
+                if isStationary && peakValleyDiff < (effectiveThreshold * 2.0) {
                     pendingStepCandidateTime = nil
+                    return
+                }
+                
+                // FIX: Ported from Android — Continuity constraint (hard gate).
+                // Requires sustained motion across multiple variance windows.
+                // Rejects one-off shakes that produce a single large pvDiff.
+                if !checkContinuityConstraint() {
+                    return
+                }
+                
+                // FIX: Ported from Android — Similarity constraint (adaptive gate).
+                // After 6+ confirmed steps, rejects peaks whose magnitude deviates
+                // more than 3σ from the running average. This learns the user's
+                // walking intensity and rejects outliers (e.g., phone bumps).
+                if !checkSimilarityConstraint(peakMagnitude: lastPeak) {
                     return
                 }
                 
@@ -436,7 +466,7 @@ class IMUSensorManager: ObservableObject {
                     if timeSinceLastStep >= minStepPeriod && timeSinceLastStep <= maxStepPeriod {
                         confirmStep(peakValleyDiff: peakValleyDiff, period: timeSinceLastStep, date: currentDate)
                     } else if timeSinceLastStep > maxStepPeriod {
-                        // Require two close candidates to resume counting after long idle periods.
+                        // Require two close candidates to resume counting after long idle
                         if let candidateTime = pendingStepCandidateTime {
                             let candidateGap = currentDate.timeIntervalSince(candidateTime)
                             if candidateGap >= minStepPeriod && candidateGap <= maxStepPeriod {
@@ -466,6 +496,41 @@ class IMUSensorManager: ObservableObject {
         }
     }
     
+    // MARK: - Step Validation Constraints (Ported from Android)
+    
+    /// Similarity constraint: after enough confirmed steps, reject peaks whose magnitude
+    /// deviates more than 3σ from the running average. This adapts to the user's walking
+    /// pattern — gentle walkers will have lower average peaks, vigorous walkers higher.
+    private func checkSimilarityConstraint(peakMagnitude: Double) -> Bool {
+        // Need sufficient history for meaningful comparison; allow all steps until then
+        guard confirmedStepPeakMagnitudes.count >= similarityMinSteps else { return true }
+        
+        let avgMagnitude = confirmedStepPeakMagnitudes.reduce(0, +) /
+            Double(confirmedStepPeakMagnitudes.count)
+        let stdDev = calculateStd(confirmedStepPeakMagnitudes, mean: avgMagnitude)
+        
+        // If standard deviation is near-zero (very consistent walker), allow the step
+        guard stdDev > 0.001 else { return true }
+        
+        let deviationFromMean = abs(peakMagnitude - avgMagnitude)
+        let normalizedDeviation = deviationFromMean / stdDev
+        
+        return normalizedDeviation <= similarityMaxDeviations
+    }
+    
+    /// Continuity constraint: requires sustained motion (4 out of 7 variance windows active).
+    /// Prevents a single shake or bump from being counted as a step — real walking produces
+    /// continuous elevated variance across multiple windows.
+    private func checkContinuityConstraint() -> Bool {
+        // Need sufficient variance history; allow steps during warmup
+        guard accelerationVariances.count >= continuityWindowSize else { return true }
+        
+        let recentWindows = accelerationVariances.suffix(continuityWindowSize)
+        let activeWindows = recentWindows.filter { $0 > varianceThreshold }.count
+        
+        return activeWindows >= continuityThreshold
+    }
+    
     private func confirmStep(peakValleyDiff: Double, period: TimeInterval, date: Date) {
         stepCount += 1
         lastStepTime = date
@@ -474,10 +539,13 @@ class IMUSensorManager: ObservableObject {
         recentStepPeriods.append(period)
         if recentStepPeriods.count > 10 { recentStepPeriods.removeFirst() }
         
+        // FIX: Use calibrated beta for step length (same formula as Android).
+        // The calibrated beta adapts the step length to the user's stride.
         let beta = stepFactorCalibration.isCalibrationValid() ?
             stepFactorCalibration.getUserBeta() : defaultBeta
         currentStepLength = beta * pow(peakValleyDiff, 0.25)
-        currentStepLength = min(max(currentStepLength, 0.3), 1.2)
+        // FIX: Removed the 0.3–1.2 clamp to match Android, which does NOT clamp.
+        // The calibrated beta already accounts for the user's stride characteristics.
         
         // Mark sample as confirmed step (Android parity)
         accelerationLogger.markSampleAsConfirmedStep(
@@ -493,6 +561,14 @@ class IMUSensorManager: ObservableObject {
         
         detectedPeaks.append(lastPeak)
         if detectedPeaks.count > 20 { detectedPeaks.removeFirst() }
+        
+        // FIX: Track confirmed step peak magnitudes for the similarity constraint.
+        // This enables adaptive step detection — after 6+ steps the system knows
+        // the user's typical peak magnitude and rejects outliers.
+        confirmedStepPeakMagnitudes.append(lastPeak)
+        if confirmedStepPeakMagnitudes.count > similarityMaxHistory {
+            confirmedStepPeakMagnitudes.removeFirst()
+        }
         
         updatePosition()
         calibrationManager?.updateCalibration(currentImuPosition: _unsafeGetCurrentPosition(), stepCount: stepCount)
@@ -634,10 +710,22 @@ class UserStepFactorCalibration {
     private var calibratedBeta: Double = 0.6
     private var isValid: Bool = false
     
+    // FIX: Track pvDiff values during calibration to compute an adaptive threshold.
+    // After calibration, the average pvDiff represents the user's typical walking
+    // intensity. 25% of this average is used as a minimum detection threshold,
+    // making step detection adapt to the individual's gait pattern.
+    private var calibrationPvDiffs: [Double] = []
+    private var calibratedAvgPvDiff: Double = 0.0
+    
     private let calibrationDistance: Double = 20.0
     private let defaultBeta: Double = 0.6
     private let calibrationBetaKey = "imu.stepCalibration.beta"
     private let calibrationValidKey = "imu.stepCalibration.isValid"
+    private let calibrationAvgPvDiffKey = "imu.stepCalibration.avgPvDiff"
+    // Fraction of average pvDiff to use as minimum threshold.
+    // 0.25 means the threshold is 25% of the user's typical walking pvDiff.
+    // This rejects movements that are too weak relative to normal gait.
+    private let adaptiveThresholdFraction: Double = 0.25
 
     init() {
         loadPersistedCalibration()
@@ -647,6 +735,7 @@ class UserStepFactorCalibration {
         isCalibrating = true
         userStepCount = 0
         accumulatedAccelerationDiff = 0
+        calibrationPvDiffs.removeAll()
     }
     
     func addStepData(peakValleyDifference: Double) {
@@ -654,6 +743,8 @@ class UserStepFactorCalibration {
         let accDiff = pow(peakValleyDifference, 0.25)
         accumulatedAccelerationDiff += accDiff
         userStepCount += 1
+        // Track raw pvDiff for adaptive threshold computation
+        calibrationPvDiffs.append(peakValleyDifference)
     }
     
     func completeCalibration() {
@@ -663,6 +754,11 @@ class UserStepFactorCalibration {
             isValid = userBeta > 0.1 && userBeta < 2.0
             if isValid {
                 calibratedBeta = userBeta
+                // Compute average pvDiff from calibration walk
+                if !calibrationPvDiffs.isEmpty {
+                    calibratedAvgPvDiff = calibrationPvDiffs.reduce(0, +) /
+                        Double(calibrationPvDiffs.count)
+                }
                 persistCalibration()
             }
         }
@@ -677,6 +773,10 @@ class UserStepFactorCalibration {
             isValid = userBeta > 0.1 && userBeta < 2.0
             if isValid {
                 calibratedBeta = userBeta
+                if !calibrationPvDiffs.isEmpty {
+                    calibratedAvgPvDiff = calibrationPvDiffs.reduce(0, +) /
+                        Double(calibrationPvDiffs.count)
+                }
                 persistCalibration()
             }
         }
@@ -688,6 +788,7 @@ class UserStepFactorCalibration {
         isCalibrating = false
         userStepCount = 0
         accumulatedAccelerationDiff = 0
+        calibrationPvDiffs.removeAll()
     }
     
     func getCalibrationStepCount() -> Int {
@@ -701,10 +802,21 @@ class UserStepFactorCalibration {
     func isCalibrationValid() -> Bool {
         return isValid
     }
+    
+    /// Returns an adaptive minimum pvDiff threshold based on calibration data.
+    /// If not calibrated, returns 0 (no adaptive floor — only the base threshold applies).
+    /// If calibrated, returns 25% of the user's average calibration pvDiff.
+    /// Example: user's avg pvDiff during calibration was 0.55 → threshold = 0.14
+    /// This means movements weaker than 14% of their typical stride are rejected.
+    func getAdaptivePvDiffThreshold() -> Double {
+        guard isValid && calibratedAvgPvDiff > 0 else { return 0 }
+        return calibratedAvgPvDiff * adaptiveThresholdFraction
+    }
 
     private func persistCalibration() {
         UserDefaults.standard.set(calibratedBeta, forKey: calibrationBetaKey)
         UserDefaults.standard.set(isValid, forKey: calibrationValidKey)
+        UserDefaults.standard.set(calibratedAvgPvDiff, forKey: calibrationAvgPvDiffKey)
     }
 
     private func loadPersistedCalibration() {
@@ -717,6 +829,12 @@ class UserStepFactorCalibration {
         calibratedBeta = storedBeta
         userBeta = storedBeta
         isValid = true
+        
+        // Load persisted average pvDiff for adaptive threshold
+        let storedAvgPvDiff = UserDefaults.standard.double(forKey: calibrationAvgPvDiffKey)
+        if storedAvgPvDiff > 0 {
+            calibratedAvgPvDiff = storedAvgPvDiff
+        }
     }
 }
 

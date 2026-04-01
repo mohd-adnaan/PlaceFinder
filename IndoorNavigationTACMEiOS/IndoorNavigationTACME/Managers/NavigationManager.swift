@@ -673,6 +673,11 @@ class NavigationManager: ObservableObject {
         
         // Reset IMU position
         sensorManager?.resetPosition()
+        // FIX: Reset lastStepCount to match the reset stepCount (now 0).
+        // Without this, the update loop guard (currentSteps > lastStepCount) blocks
+        // ALL new steps until the count exceeds the OLD segment's value — causing
+        // announcements to arrive progressively later with each segment change.
+        lastStepCount = 0
         try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
         
         guard let resetPosition = sensorManager?.getCurrentPosition() else {

@@ -509,13 +509,23 @@ class NavigationManager: ObservableObject {
                 updateCurrentSegmentId(segmentInfo.segmentIndex)
             }
             
-            // Handle segment-based recalibration (MATCHING ANDROID exactly)
+            // Handle segment-based recalibration
             if response.status == "segment_change", let newPos = response.newMapPosition, newPos.count >= 2 {
                 await handleSegmentRecalibration(response: response, reason: "segment_change")
             }
             
             if response.status == "segment_ending", let newPos = response.newMapPosition, newPos.count >= 2 {
                 await handleSegmentRecalibration(response: response, reason: "segment_ending")
+            }
+            
+            // FIX: Handle no_segment_ending with position-only correction.
+            // The server sends this at turn warnings with corrected position (segment endpoint).
+            // Without this, any accumulated position lag from step length underestimation
+            // persists through the turn, causing the turn instruction to arrive late.
+            // This snaps position forward without resetting filter/step detection state.
+            if response.status == "no_segment_ending", let newPos = response.newMapPosition, newPos.count >= 2 {
+                await handlePositionOnlyCorrection(mapX: newPos[0], mapY: newPos[1],
+                    mapBearing: newPos.count >= 3 ? newPos[2] : nil)
             }
             
             // Handle navigation instruction
@@ -671,14 +681,16 @@ class NavigationManager: ObservableObject {
         
         print("NavigationManager: Recalibrating for \(reason) at (\(mapX), \(mapY))")
         
-        // Reset IMU position
-        sensorManager?.resetPosition()
+        // FIX: Use resetPositionOnly() instead of resetPosition().
+        // Full resetPosition() kills the Butterworth filter state, causing the first
+        // 1-2 steps after recalibration to have ~20% lower pvDiff values (filter warmup).
+        // This produces shorter step lengths, accumulating ~0.5m of position lag per segment.
+        // resetPositionOnly() resets x/y/stepCount but preserves filter momentum,
+        // peak/valley detection, and step timing — so step detection continues seamlessly.
+        sensorManager?.resetPositionOnly()
         // FIX: Reset lastStepCount to match the reset stepCount (now 0).
-        // Without this, the update loop guard (currentSteps > lastStepCount) blocks
-        // ALL new steps until the count exceeds the OLD segment's value — causing
-        // announcements to arrive progressively later with each segment change.
         lastStepCount = 0
-        try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms (reduced from 100ms — filter is preserved)
         
         guard let resetPosition = sensorManager?.getCurrentPosition() else {
             print("NavigationManager: Failed to get reset position for recalibration")
@@ -706,6 +718,33 @@ class NavigationManager: ObservableObject {
             await MainActor.run {
                 navigationState.errorMessage = "\(reason) recalibration failed, continuing with current calibration"
             }
+        }
+    }
+    
+    /// FIX: Position-only correction without any sensor reset.
+    /// Used for `no_segment_ending` (turn warnings) where the server provides a corrected
+    /// position at the segment endpoint. This snaps the map position forward to compensate
+    /// for any accumulated step length underestimation, without interrupting the filter
+    /// or step detection state. The user keeps walking seamlessly while the position
+    /// correction ensures the next segment_change triggers at the right time.
+    private func handlePositionOnlyCorrection(mapX: Double, mapY: Double, mapBearing: Double?) async {
+        guard let currentPos = sensorManager?.getCurrentPosition() else {
+            print("NavigationManager: ⚠️ Position-only correction failed — no current position")
+            return
+        }
+        
+        let success = calibrationManager?.calibrateWithMapPosition(
+            currentImuPosition: currentPos,
+            mapX: mapX,
+            mapY: mapY,
+            mapBearing: mapBearing,
+            stepCount: sensorManager?.imuState.stepCount ?? 0
+        ) ?? false
+        
+        if success {
+            print("NavigationManager: ✓ Position-only correction applied to (\(String(format: "%.2f", mapX)), \(String(format: "%.2f", mapY)))")
+        } else {
+            print("NavigationManager: ✗ Position-only correction failed")
         }
     }
     

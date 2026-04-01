@@ -15,6 +15,7 @@
 		5F4F75B12F3D18B3002B79DF /* NavigationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4F75B02F3D18B3002B79DF /* NavigationManager.swift */; };
 		5FB48BF22F4D446700D733AB /* OpenAIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB48BF12F4D445B00D733AB /* OpenAIService.swift */; };
 		5FB48BF42F4D449500D733AB /* ConversationOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB48BF32F4D449200D733AB /* ConversationOrbView.swift */; };
+		5FCE666B2F7D8ABD00CBEB98 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 5FCE666A2F7D8AB700CBEB98 /* Config.xcconfig */; };
 		5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */; };
 		5FE9BCD02F5D38B2009F4503 /* Landingpageview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */; };
 		5FE9BCD42F5D38FF009F4503 /* Voicenavigationmanager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */; };
@@ -47,9 +48,9 @@
 		5F3F2D802F678F84008261F0 /* DebugOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugOverlayView.swift; sourceTree = "<group>"; };
 		5F4F75AE2F3D0F31002B79DF /* map_data.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = map_data.json; sourceTree = "<group>"; };
 		5F4F75B02F3D18B3002B79DF /* NavigationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationManager.swift; sourceTree = "<group>"; };
-		5F99098E2F24365E00C76C41 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		5FB48BF12F4D445B00D733AB /* OpenAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIService.swift; sourceTree = "<group>"; };
 		5FB48BF32F4D449200D733AB /* ConversationOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationOrbView.swift; sourceTree = "<group>"; };
+		5FCE666A2F7D8AB700CBEB98 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
 		5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config_EXAPMLE.xcconfig; sourceTree = "<group>"; };
 		5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Landingpageview.swift; sourceTree = "<group>"; };
 		5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voicenavigationmanager.swift; sourceTree = "<group>"; };
@@ -108,8 +109,8 @@
 				A50000010000000000000008 /* Views */,
 				A20000010000000000000021 /* Assets.xcassets */,
 				A20000010000000000000022 /* Info.plist */,
-				5F99098E2F24365E00C76C41 /* Config.xcconfig */,
 				5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */,
+				5FCE666A2F7D8AB700CBEB98 /* Config.xcconfig */,
 			);
 			path = IndoorNavigationTACME;
 			sourceTree = "<group>";
@@ -251,6 +252,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5FCE666B2F7D8ABD00CBEB98 /* Config.xcconfig in Resources */,
 				5F4F75AF2F3D0F31002B79DF /* map_data.json in Resources */,
 				A10000010000000000000021 /* Assets.xcassets in Resources */,
 				5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */,

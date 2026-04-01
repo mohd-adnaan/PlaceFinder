@@ -100,7 +100,14 @@ class IMUSensorManager: ObservableObject {
     // Constants
     private let gyroNoiseThreshold: Double = 0.01
     private let maxGyroRate: Double = 5.0
-    private let defaultBeta: Double = 0.6
+    
+    // FIX: Default beta raised from 0.6 to 0.8 for iOS.
+    // Android uses raw accelerometer magnitude (pvDiff ~1.0-5.0, pvDiff^0.25 ~1.0-1.5).
+    // iOS uses filtered vertical acceleration (pvDiff ~0.3-0.7, pvDiff^0.25 ~0.74-0.92).
+    // With Android beta=0.6: step = 0.6 * 1.2 = 0.72m
+    // With iOS beta=0.6:     step = 0.6 * 0.84 = 0.50m (too short!)
+    // With iOS beta=0.8:     step = 0.8 * 0.84 = 0.67m (correct)
+    private let defaultBeta: Double = 0.8
     
     // Step timing constraints
     private let minStepPeriod: TimeInterval = 0.3
@@ -164,9 +171,6 @@ class IMUSensorManager: ObservableObject {
     
     func resetPosition() {
         // FIX B: Route through sensorQueue to avoid data races with processMotionUpdate.
-        // processMotionUpdate runs on sensorQueue and mutates the same arrays/counters.
-        // Without synchronization, concurrent access from handleSegmentRecalibration
-        // (on a Task context) causes crashes — especially during rapid segment changes.
         sensorQueue.sync {
             currentX = 0
             currentY = 0
@@ -185,10 +189,43 @@ class IMUSensorManager: ObservableObject {
             butterworthFilter.reset()
             accelerationLogger.clear()
             totalSamples = 0
-            // Update UI state while still on sensorQueue (updateIMUState uses _unsafeGetCurrentPosition)
             updateIMUState()
         }
         print("IMUSensorManager: Position reset (thread-safe)")
+    }
+    
+    /// FIX: Position-only reset that preserves filter and step detection momentum.
+    /// Used for segment_change recalibration instead of full resetPosition().
+    ///
+    /// Full resetPosition() kills the Butterworth filter state, which means the
+    /// first 1-2 steps after recalibration have distorted pvDiff values (~20% lower),
+    /// producing shorter step lengths. Over a 5m segment, this accumulates to ~0.5m
+    /// of position lag — enough to cause announcements to arrive after the user
+    /// has already passed the landmark.
+    ///
+    /// This method resets ONLY position/stepCount while preserving:
+    /// - Butterworth filter coefficients → no warmup delay
+    /// - Peak/valley detection state → continuous step detection
+    /// - Step timing and periods → no "first step" penalty
+    /// - Acceleration variances → continuity constraint stays warm
+    func resetPositionOnly() {
+        sensorQueue.sync {
+            currentX = 0
+            currentY = 0
+            stepCount = 0
+            // Preserve: filteredAcceleration, accelerationTimestamps, accelerationVariances
+            // Preserve: lastPeak, lastValley, lastPeakTime
+            // Preserve: butterworthFilter state
+            // Preserve: recentStepPeriods, lastStepTime, pendingStepCandidateTime
+            // Preserve: confirmedStepPeakMagnitudes (similarity constraint stays warm)
+            
+            // Only clear the logger and detected peaks display list
+            detectedPeaks.removeAll()
+            accelerationLogger.clear()
+            totalSamples = 0
+            updateIMUState()
+        }
+        print("IMUSensorManager: Position-only reset (filter preserved)")
     }
     
     func setInitialBearing(_ bearing: Double) {
@@ -718,7 +755,9 @@ class UserStepFactorCalibration {
     private var calibratedAvgPvDiff: Double = 0.0
     
     private let calibrationDistance: Double = 20.0
-    private let defaultBeta: Double = 0.6
+    // FIX: Default beta raised from 0.6 to 0.8 for iOS signal scale.
+    // See IMUSensorManager.defaultBeta comment for full explanation.
+    private let defaultBeta: Double = 0.8
     private let calibrationBetaKey = "imu.stepCalibration.beta"
     private let calibrationValidKey = "imu.stepCalibration.isValid"
     private let calibrationAvgPvDiffKey = "imu.stepCalibration.avgPvDiff"

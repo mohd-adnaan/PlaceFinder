@@ -207,6 +207,32 @@ class NavigationManager: ObservableObject {
             return .failure(NSError(domain: "Nav", code: -2, userInfo: [NSLocalizedDescriptionKey: "No calibration data"]))
         }
         
+        // ═══════════════════════════════════════════════════════════════════
+        // ALIGNMENT INSTRUCTION (Pre-calibration)
+        //
+        // The initial bearing calibration assumes the user is facing a
+        // specific direction at the source point. If the user is facing
+        // the wrong way, the gyroscope integration starts from a wrong
+        // reference and ALL subsequent turn-by-turn instructions will be
+        // incorrect (e.g. "turn left" when they should turn right).
+        //
+        // In the Trottier Building, the standard starting reference is
+        // "back facing the elevator" — this aligns the user with the
+        // corridor so the initial bearing matches the server's expectation.
+        //
+        // The 5-second wait covers:
+        //   ~3s for TTS to finish speaking the instruction
+        //   ~2s for the user to physically adjust their position
+        // ═══════════════════════════════════════════════════════════════════
+        let isFrenchAlignment = languageManager?.isFrench() == true
+        let alignmentMessage = isFrenchAlignment
+            ? "Veuillez vous positionner dos à l'ascenseur avant de commencer la navigation."
+            : "Please position yourself with your back facing the elevator before we begin."
+        ttsManager?.speak(alignmentMessage, force: true)
+        
+        print("NavigationManager: Waiting for user to align (back facing elevator)...")
+        try? await Task.sleep(nanoseconds: 5_500_000_000) // 5.5s: TTS (~3s) + user orient (~2.5s)
+        
         // Reset sensors before calibration
         sensorManager?.resetPosition()
         try? await Task.sleep(nanoseconds: 200_000_000) // 200ms settle time

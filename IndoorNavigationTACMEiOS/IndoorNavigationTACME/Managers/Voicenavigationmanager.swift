@@ -10,6 +10,7 @@
 import Foundation
 import Speech
 import AVFoundation
+import AudioToolbox   // ← For SystemSoundID beeps (accessibility feedback)
 import Combine
 import UIKit
 
@@ -256,6 +257,19 @@ class VoiceNavigationManager: ObservableObject {
         voiceInputState.isListening = true
         voiceInputState.debugInfo = "Listening..."
         lastPartialResult = ""
+
+        // ═══════════════════════════════════════════════════════════════════
+        // ACCESSIBILITY FIX: Play an audible "ready" beep so visually
+        // impaired users know the microphone is ACTIVE and they can speak.
+        //
+        // Root cause: Users were saying "yes" immediately after hearing the
+        // TTS prompt, but SFSpeechRecognizer wasn't listening yet. The beep
+        // eliminates this timing mismatch — speak AFTER the beep, not before.
+        //
+        // Sound 1113 = "begin recording" system tone (short, recognizable).
+        // Haptic is kept as a secondary cue for users who can feel it.
+        // ═══════════════════════════════════════════════════════════════════
+        playListeningReadyBeep()
         feedbackGenerator?.impactOccurred()
 
         let currentSession = sessionCounter
@@ -734,6 +748,20 @@ class VoiceNavigationManager: ObservableObject {
         return spaced
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
             .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    // MARK: - Audible Feedback
+
+    /// Play a short system tone to signal "microphone is active — speak now".
+    ///
+    /// This is critical for visually impaired users who cannot see the red
+    /// "Listening" indicator. Without this beep, users speak before the
+    /// recognizer is ready, causing their response to be lost.
+    ///
+    /// Sound 1113 = "begin recording" beep (gentle, non-intrusive).
+    /// Falls back to 1057 (tock) if 1113 is unavailable on the device.
+    private func playListeningReadyBeep() {
+        AudioServicesPlaySystemSound(1113)
     }
 
     // MARK: - Response Detection

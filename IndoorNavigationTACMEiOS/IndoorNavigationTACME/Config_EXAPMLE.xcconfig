@@ -1,5 +1,5 @@
 // Config.xcconfig template
 // Copy this file to Config.xcconfig and add your API key
 
-GEMINI_API_KEY = "your-api-key-herec",
+GEMINI_API_KEY = "your-api-key-here",
 OPENAI_API_KEY = "your-api-key-here"

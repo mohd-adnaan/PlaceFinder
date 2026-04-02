@@ -55,10 +55,30 @@ struct NavigationSettingsView: View {
                         onStartCalibration: {
                             didAutoSubmitCurrentCalibration = false
                             sensorManager.startStepCalibration()
+                            // Announce calibration start so the user knows to start walking
+                            let msg = languageManager.currentLanguage == .french
+                                ? "Calibration démarrée. Marchez 20 mètres."
+                                : "Calibration started. Walk 20 meters."
+                            ttsManager.speak(msg, force: true)
                         },
                         onCompleteCalibration: {
                             didAutoSubmitCurrentCalibration = false
                             sensorManager.completeStepCalibration()
+                            // Announce result so visually impaired users get feedback
+                            let beta = sensorManager.imuState.beta
+                            let isValid = sensorManager.imuState.isStepCalibrationValid
+                            let isFrench = languageManager.currentLanguage == .french
+                            if isValid {
+                                let msg = isFrench
+                                    ? "Calibration terminée. Facteur bêta: \(String(format: "%.3f", beta))"
+                                    : "Step calibration complete. Beta factor: \(String(format: "%.3f", beta))"
+                                ttsManager.speakPriority(msg)
+                            } else {
+                                let msg = isFrench
+                                    ? "Données insuffisantes. Réessayez."
+                                    : "Not enough data collected. Please try again."
+                                ttsManager.speakPriority(msg)
+                            }
                         },
                         onStopCalibration: {
                             didAutoSubmitCurrentCalibration = false
@@ -164,6 +184,29 @@ struct NavigationSettingsView: View {
 
                 didAutoSubmitCurrentCalibration = true
                 sensorManager.completeStepCalibration()
+
+                // ═══════════════════════════════════════════════════════════
+                // ACCESSIBILITY FIX: Announce calibration completion via TTS.
+                //
+                // Root cause: Auto-calibration triggers silently. Sighted
+                // users see the UI update; visually impaired users get zero
+                // feedback. This spoken confirmation closes the gap.
+                // ═══════════════════════════════════════════════════════════
+                let beta = sensorManager.imuState.beta
+                let isValid = sensorManager.imuState.isStepCalibrationValid
+                let isFrench = languageManager.currentLanguage == .french
+
+                if isValid {
+                    let message = isFrench
+                        ? "Calibration terminée. Facteur bêta: \(String(format: "%.3f", beta))"
+                        : "Step calibration complete. Beta factor: \(String(format: "%.3f", beta))"
+                    ttsManager.speakPriority(message)
+                } else {
+                    let message = isFrench
+                        ? "Calibration terminée, mais les données sont insuffisantes."
+                        : "Calibration finished, but not enough data was collected."
+                    ttsManager.speakPriority(message)
+                }
             }
         }
     }

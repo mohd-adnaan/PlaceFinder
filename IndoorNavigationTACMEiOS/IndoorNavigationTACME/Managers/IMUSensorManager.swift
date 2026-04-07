@@ -351,8 +351,8 @@ class IMUSensorManager: ObservableObject {
         // phases together, halving the effective amplitude and making the bandpass
         // filter output ~34x weaker than what Android sees.
         let gravityMagnitude = sqrt(gravity.x * gravity.x +
-                                     gravity.y * gravity.y +
-                                     gravity.z * gravity.z)
+                                    gravity.y * gravity.y +
+                                    gravity.z * gravity.z)
         let verticalAccel: Double
         if gravityMagnitude > 0.01 {
             // Project userAcceleration onto gravity direction (signed)
@@ -366,8 +366,8 @@ class IMUSensorManager: ObservableObject {
         
         // Also compute magnitude for logging
         let magnitude = sqrt(acceleration.x * acceleration.x +
-                            acceleration.y * acceleration.y +
-                            acceleration.z * acceleration.z)
+                             acceleration.y * acceleration.y +
+                             acceleration.z * acceleration.z)
         
         totalSamples += 1
         
@@ -436,21 +436,21 @@ class IMUSensorManager: ObservableObject {
         // Peak detection: local maximum above BOTH the dynamic upper threshold
         // AND the absolute minimum amplitude (rejects hand tremor at standstill).
         if previous > beforePrevious &&
-           previous > current &&
-           previous > upperThreshold &&
-           previous > absoluteMinPeakAmplitude {
+            previous > current &&
+            previous > upperThreshold &&
+            previous > absoluteMinPeakAmplitude {
             lastPeak = previous
             lastPeakTime = accelerationTimestamps.count >= 2 ?
-                accelerationTimestamps[accelerationTimestamps.count - 2] : timestamp
+            accelerationTimestamps[accelerationTimestamps.count - 2] : timestamp
             accelerationLogger.markLastSampleAsPeak()
         }
         
         // Valley detection: local minimum below BOTH thresholds (after a peak)
         if previous < beforePrevious &&
-           previous < current &&
-           previous < lowerThreshold &&
-           previous < absoluteMinValleyAmplitude &&
-           lastPeakTime > 0 {
+            previous < current &&
+            previous < lowerThreshold &&
+            previous < absoluteMinValleyAmplitude &&
+            lastPeakTime > 0 {
             
             // Reject stale peaks from a previous walking burst
             let peakAge = timestamp - lastPeakTime
@@ -475,7 +475,7 @@ class IMUSensorManager: ObservableObject {
                 
                 // Soft gate: raise threshold further when stationary
                 let recentVariance = accelerationVariances.suffix(5).reduce(0, +) /
-                    Double(max(accelerationVariances.suffix(5).count, 1))
+                Double(max(accelerationVariances.suffix(5).count, 1))
                 let isStationary = recentVariance < (varianceThreshold * stationaryVarianceGateMultiplier)
                 if isStationary && peakValleyDiff < (effectiveThreshold * 2.0) {
                     pendingStepCandidateTime = nil
@@ -543,7 +543,7 @@ class IMUSensorManager: ObservableObject {
         guard confirmedStepPeakMagnitudes.count >= similarityMinSteps else { return true }
         
         let avgMagnitude = confirmedStepPeakMagnitudes.reduce(0, +) /
-            Double(confirmedStepPeakMagnitudes.count)
+        Double(confirmedStepPeakMagnitudes.count)
         let stdDev = calculateStd(confirmedStepPeakMagnitudes, mean: avgMagnitude)
         
         // If standard deviation is near-zero (very consistent walker), allow the step
@@ -579,7 +579,7 @@ class IMUSensorManager: ObservableObject {
         // FIX: Use calibrated beta for step length (same formula as Android).
         // The calibrated beta adapts the step length to the user's stride.
         let beta = stepFactorCalibration.isCalibrationValid() ?
-            stepFactorCalibration.getUserBeta() : defaultBeta
+        stepFactorCalibration.getUserBeta() : defaultBeta
         currentStepLength = beta * pow(peakValleyDiff, 0.25)
         // FIX: Removed the 0.3–1.2 clamp to match Android, which does NOT clamp.
         // The calibrated beta already accounts for the user's stride characteristics.
@@ -674,7 +674,7 @@ class IMUSensorManager: ObservableObject {
     
     private func updateIMUState() {
         let isMoving = !accelerationVariances.isEmpty &&
-                       accelerationVariances.suffix(3).contains { $0 > varianceThreshold }
+        accelerationVariances.suffix(3).contains { $0 > varianceThreshold }
         
         let filterQuality: String
         if detectedPeaks.count >= 3 && !recentStepPeriods.isEmpty {
@@ -685,8 +685,7 @@ class IMUSensorManager: ObservableObject {
             filterQuality = "Initializing"
         }
         
-        let calibrationStepCount = stepFactorCalibration.getCalibrationStepCount()
-        
+        // Capture all values locally (safe from any thread since these are private vars)
         let newState = IMUState(
             position: _unsafeGetCurrentPosition(),
             stepCount: stepCount,
@@ -698,12 +697,19 @@ class IMUSensorManager: ObservableObject {
             beta: stepFactorCalibration.getUserBeta(),
             isStepCalibrationValid: stepFactorCalibration.isCalibrationValid(),
             isCalibrating: stepFactorCalibration.isCalibrating,
-            calibrationStepCount: calibrationStepCount,
+            calibrationStepCount: stepFactorCalibration.getCalibrationStepCount(),
             bearing: currentBearing
         )
         
-        DispatchQueue.main.async { [weak self] in
-            self?.imuState = newState
+        // FIX: Always dispatch @Published write to main thread.
+        // Motion callbacks already come on .main (safe, just defers 1 runloop).
+        // Background calls from resetPosition/resetPositionOnly are the crash source.
+        if Thread.isMainThread {
+            imuState = newState
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.imuState = newState
+            }
         }
     }
 }

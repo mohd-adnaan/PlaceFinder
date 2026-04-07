@@ -207,42 +207,28 @@ class NavigationManager: ObservableObject {
             return .failure(NSError(domain: "Nav", code: -2, userInfo: [NSLocalizedDescriptionKey: "No calibration data"]))
         }
         
-        // ═══════════════════════════════════════════════════════════════════
-        // ALIGNMENT INSTRUCTION (Pre-calibration)
-        //
-        // The initial bearing calibration assumes the user is facing a
-        // specific direction at the source point. If the user is facing
-        // the wrong way, the gyroscope integration starts from a wrong
-        // reference and ALL subsequent turn-by-turn instructions will be
-        // incorrect (e.g. "turn left" when they should turn right).
-        //
-        // In the Trottier Building, the standard starting reference is
-        // "back facing the elevator" — this aligns the user with the
-        // corridor so the initial bearing matches the server's expectation.
-        //
-        // The 5-second wait covers:
-        //   ~3s for TTS to finish speaking the instruction
-        //   ~2s for the user to physically adjust their position
-        // ═══════════════════════════════════════════════════════════════════
         let isFrenchAlignment = languageManager?.isFrench() == true
+        let sourceName = navigationState.source.isEmpty ? "your starting point" : navigationState.source
+        let spokenSource = sourceName
+            .replacingOccurrences(of: "([a-z])([A-Z])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "([A-Za-z])([0-9])", with: "$1 $2", options: .regularExpression)
+            .replacingOccurrences(of: "_", with: " ")
         let alignmentMessage = isFrenchAlignment
-            ? "Veuillez vous positionner dos à l'ascenseur avant de commencer la navigation."
-            : "Please position yourself with your back facing the elevator before we begin."
+            ? "Veuillez vous positionner dos à \(spokenSource) avant de commencer la navigation."
+            : "Please position yourself with your back facing \(spokenSource) before we begin."
         ttsManager?.speak(alignmentMessage, force: true)
         
-        print("NavigationManager: Waiting for user to align (back facing elevator)...")
-        try? await Task.sleep(nanoseconds: 5_500_000_000) // 5.5s: TTS (~3s) + user orient (~2.5s)
+        print("NavigationManager: Waiting for user to align (back facing \(sourceName))...")
+        try? await Task.sleep(nanoseconds: 5_500_000_000)
         
         // Reset sensors before calibration
         sensorManager?.resetPosition()
-        try? await Task.sleep(nanoseconds: 200_000_000) // 200ms settle time
+        try? await Task.sleep(nanoseconds: 200_000_000)
         
-        // Get current IMU position after reset
         guard let currentImuPosition = sensorManager?.getCurrentPosition() else {
             return .failure(NSError(domain: "Nav", code: -3, userInfo: [NSLocalizedDescriptionKey: "Sensor error"]))
         }
         
-        // Calibrate using map position from server
         let success = calibrationManager?.calibrateWithMapPosition(
             currentImuPosition: currentImuPosition,
             mapX: calibration.mapStartX,
@@ -259,14 +245,12 @@ class NavigationManager: ObservableObject {
         
         print("NavigationManager: ✓ Calibration successful")
         
-        // Reset tracking state
         lastStepCount = sensorManager?.imuState.stepCount ?? 0
         lastInstructionText = ""
         lastInstructionTime = Date.distantPast
         updateCount = 0
         retryCount = 0
         
-        // Update state ON MAIN THREAD
         await MainActor.run {
             navigationState.isCalibrated = true
             navigationState.isNavigating = true
@@ -276,7 +260,6 @@ class NavigationManager: ObservableObject {
             navigationState.qrSyncMode = "SMART_SYNC"
         }
         
-        // Start QR detection on main thread
         await MainActor.run {
             qrDetector?.startScanning()
         }
@@ -286,14 +269,10 @@ class NavigationManager: ObservableObject {
             : "Navigation started"
         ttsManager?.speak(message, force: true)
         
-        // Send first position update immediately at calibration point
         print("NavigationManager: Sending FIRST position update at calibration point...")
         await sendFirstPositionUpdate()
         
-        // Start continuous update loop
         startPositionUpdateLoop()
-        
-        // Start QR monitoring
         startQRMonitoring()
         
         return .success(())
@@ -302,21 +281,17 @@ class NavigationManager: ObservableObject {
     func stopNavigation() {
         print("NavigationManager: Stopping navigation")
         
-        // Cancel tasks
         updateTask?.cancel()
         updateTask = nil
         qrMonitoringTask?.cancel()
         qrMonitoringTask = nil
         
-        // Stop QR detection
         qrDetector?.stopScanning()
         
-        // Reset QR state
         currentQRId = nil
         currentQRDetectionTime = nil
         lastSentQRId = nil
         
-        // Update state
         DispatchQueue.main.async {
             self.navigationState.isNavigating = false
             self.navigationState.isInitialized = false
@@ -330,7 +305,6 @@ class NavigationManager: ObservableObject {
         
         ttsManager?.speakPriority("Navigation stopped")
         
-        // Reset sensors and calibration
         sensorManager?.resetPosition()
         calibrationManager?.resetCalibration()
         tempCalibrationData = nil
@@ -353,7 +327,9 @@ class NavigationManager: ObservableObject {
         
         do {
             let response = try await NavigationAPIService.shared.updatePosition(request: request)
-            await handleNavigationResponse(response, isFirstUpdate: false)
+            // Handle recalibration for force-update path
+            await handleRecalibrationFromResponse(response)
+            await handleNavigationResponse(response)
             return .success(response.instructions ?? response.message ?? "OK")
         } catch {
             return .failure(error)
@@ -370,16 +346,13 @@ class NavigationManager: ObservableObject {
         
         let elapsed = Date().timeIntervalSince(detectionTime)
         
-        // Within persistence window
         if elapsed <= qrPersistenceWindow {
-            // Don't re-send same QR unless it's a fresh detection
             if qrId == lastSentQRId && elapsed > qrChangeDetectionWindow {
                 return (false, nil)
             }
             return (true, qrId)
         }
         
-        // Expired
         currentQRId = nil
         currentQRDetectionTime = nil
         return (false, nil)
@@ -389,12 +362,10 @@ class NavigationManager: ObservableObject {
         qrMonitoringTask?.cancel()
         qrMonitoringTask = Task {
             while !Task.isCancelled && navigationState.isNavigating {
-                // Read QR state from the detector's published detectionState
                 if let qrDetector = qrDetector,
                    qrDetector.detectionState.isDetected,
                    let rawContent = qrDetector.detectionState.detectedContent {
                     
-                    // Extract the QR ID from raw content (e.g. "QR_Id:https://qrco.de/bgErvr" → "bgErvr")
                     let detectedId = QRIdExtractor.extractQRCodeId(rawContent) ?? rawContent
                     
                     let isNewQR = detectedId != currentQRId
@@ -414,7 +385,7 @@ class NavigationManager: ObservableObject {
                     }
                 }
                 
-                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
         }
     }
@@ -439,9 +410,12 @@ class NavigationManager: ObservableObject {
             print("NavigationManager: First response status: \(response.status)")
             print("NavigationManager: First response message: \(response.message ?? "nil")")
             print("NavigationManager: First response instructions: \(response.instructions ?? "nil")")
-            await handleNavigationResponse(response, isFirstUpdate: true)
             
-            // If the first response was just "on track" (filtered), give a helpful initial direction
+            // Handle recalibration for first-update path
+            await handleRecalibrationFromResponse(response)
+            await handleNavigationResponse(response)
+            
+            // If first response was just "on track", give helpful initial direction
             let firstMsg = (response.message ?? response.instructions ?? "").lowercased()
             if firstMsg.contains("on track") || firstMsg.contains("no value return") || firstMsg.isEmpty {
                 let initialDirection = buildInitialDirectionInstruction()
@@ -464,7 +438,6 @@ class NavigationManager: ObservableObject {
         }
     }
     
-    /// Build a helpful initial instruction based on path data
     private func buildInitialDirectionInstruction() -> String {
         let source = navigationState.source
         let destination = navigationState.destination
@@ -486,6 +459,7 @@ class NavigationManager: ObservableObject {
             }
         }
     }
+    
     private func performPositionUpdate() async {
         guard let sensorManager = sensorManager else {
             print("NavigationManager: ⚠️ performPositionUpdate - sensorManager is nil")
@@ -493,7 +467,6 @@ class NavigationManager: ObservableObject {
         }
         
         guard let mapPosition = sensorManager.getCurrentMapPosition() else {
-            // This was failing silently - now we'll see it
             print("NavigationManager: ⚠️ performPositionUpdate - getCurrentMapPosition returned nil (calibrationManager not set?)")
             return
         }
@@ -508,7 +481,6 @@ class NavigationManager: ObservableObject {
         // Get smart QR state
         let (qrDetected, qrId) = getSmartQRState()
         
-        // Track sent QR
         if qrDetected, let qrId = qrId {
             lastSentQRId = qrId
             await MainActor.run {
@@ -530,32 +502,33 @@ class NavigationManager: ObservableObject {
             let response = try await NavigationAPIService.shared.updatePosition(request: request)
             retryCount = 0
             
-            // Handle segment info BEFORE handling response (matching Android order)
+            // Handle segment info BEFORE recalibration (matching Android order)
             if let segmentInfo = response.segmentInfo {
                 updateCurrentSegmentId(segmentInfo.segmentIndex)
             }
             
-            // Handle segment-based recalibration
-            if response.status == "segment_change", let newPos = response.newMapPosition, newPos.count >= 2 {
+            // ── CRITICAL: Gate recalibration by status (matching Android exactly) ──
+            // Android only recalibrates for segment_change and segment_ending.
+            // no_segment_ending: bearing-only update, NO position recalibration.
+            let status = response.status.lowercased()
+            
+            if status == "segment_change", let newPos = response.newMapPosition, newPos.count >= 2 {
                 await handleSegmentRecalibration(response: response, reason: "segment_change")
             }
             
-            if response.status == "segment_ending", let newPos = response.newMapPosition, newPos.count >= 2 {
+            if status == "segment_ending", let newPos = response.newMapPosition, newPos.count >= 2 {
                 await handleSegmentRecalibration(response: response, reason: "segment_ending")
             }
             
-            // FIX: Handle no_segment_ending with position-only correction.
-            // The server sends this at turn warnings with corrected position (segment endpoint).
-            // Without this, any accumulated position lag from step length underestimation
-            // persists through the turn, causing the turn instruction to arrive late.
-            // This snaps position forward without resetting filter/step detection state.
-            if response.status == "no_segment_ending", let newPos = response.newMapPosition, newPos.count >= 2 {
-                await handlePositionOnlyCorrection(mapX: newPos[0], mapY: newPos[1],
-                    mapBearing: newPos.count >= 3 ? newPos[2] : nil)
+            // no_segment_ending: bearing-only correction, NO position snap
+            if status == "no_segment_ending", let newPos = response.newMapPosition, newPos.count >= 3 {
+                let bearing = newPos[2]
+                sensorManager.setInitialBearing(bearing)
+                print("NavigationManager: no_segment_ending — bearing-only update to \(String(format: "%.1f", bearing))°, NO position recalibration")
             }
             
-            // Handle navigation instruction
-            await handleNavigationResponse(response, isFirstUpdate: false)
+            // Handle navigation message/TTS (no recalibration — already done above)
+            await handleNavigationResponse(response)
             
         } catch {
             retryCount += 1
@@ -574,25 +547,46 @@ class NavigationManager: ObservableObject {
         }
     }
     
-    // MARK: - Response Handling (MATCHING ANDROID LOGIC)
+    // MARK: - Recalibration from non-loop paths (forceUpdate, firstUpdate)
     
-    private func handleNavigationResponse(_ response: NavigationResponse, isFirstUpdate: Bool) async {
-        // CRITICAL FIX: Match Android's instruction extraction order
-        let newInstruction = response.message ?? response.instructions
+    /// Handles recalibration for code paths that don't go through performPositionUpdate
+    /// (sendFirstPositionUpdate, forcePositionUpdate). performPositionUpdate handles
+    /// recalibration inline before calling handleNavigationResponse.
+    private func handleRecalibrationFromResponse(_ response: NavigationResponse) async {
+        let status = response.status.lowercased()
         
-        guard let instruction = newInstruction, !instruction.isEmpty else {
-            if response.status == "error" {
-                let errorMsg = "Server error: \(response.message ?? "Unknown")"
-                print("NavigationManager: \(errorMsg)")
-                await MainActor.run {
-                    navigationState.errorMessage = errorMsg
-                }
-                ttsManager?.speakCritical("Navigation error occurred")
-            }
-            return
+        if let segmentInfo = response.segmentInfo {
+            updateCurrentSegmentId(segmentInfo.segmentIndex)
         }
         
-        // Translate if needed
+        guard let newPos = response.newMapPosition, newPos.count >= 2 else { return }
+        
+        switch status {
+        case "segment_change":
+            await handleSegmentRecalibration(response: response, reason: "segment_change")
+        case "segment_ending":
+            await handleSegmentRecalibration(response: response, reason: "segment_ending")
+        case "no_segment_ending":
+            if newPos.count >= 3 {
+                sensorManager?.setInitialBearing(newPos[2])
+                print("NavigationManager: no_segment_ending — bearing-only update to \(String(format: "%.1f", newPos[2]))°")
+            }
+        default:
+            break
+        }
+    }
+    
+    // MARK: - Response Handling (message + TTS only, NO recalibration)
+    
+    private func handleNavigationResponse(_ response: NavigationResponse) async {
+        let status = response.status.lowercased()
+        
+        // Use message field (Android: response.message ?: response.instructions)
+        // Backend sends turn instructions in "message" with instructions=null
+        let instructionText = response.message ?? response.instructions
+        
+        guard let instruction = instructionText, !instruction.isEmpty else { return }
+        
         let translatedInstruction: String
         if languageManager?.isFrench() == true {
             translatedInstruction = await languageManager?.translateFromEnglish(instruction) ?? instruction
@@ -600,73 +594,81 @@ class NavigationManager: ObservableObject {
             translatedInstruction = instruction
         }
         
-        // Update UI state ON MAIN THREAD
+        // Filter skip phrases (matching Android)
+        let lowerInstruction = translatedInstruction.lowercased()
+        let skipPhrases = [
+            "no value return",
+            "you are on track",
+            "on track",
+            "pas de valeur de retour",
+            "aucune valeur de retour",
+            "valeur de retour",
+            "vous êtes sur la bonne voie",
+            "sur la bonne voie"
+        ]
+        
+        if skipPhrases.contains(where: { lowerInstruction.contains($0) }) {
+            print("NavigationManager: Filtered skip phrase: '\(instruction)'")
+            return
+        }
+        
         await MainActor.run {
             navigationState.currentInstruction = translatedInstruction
             navigationState.serverResponse = response.message
             navigationState.lastUpdateTime = Date()
-            navigationState.errorMessage = nil
         }
         
-        // Handle instruction announcement (matching Android logic)
-        handleInstructionAnnouncement(translatedInstruction, isFirst: isFirstUpdate)
+        // Announce with status-aware priority routing
+        handleInstructionAnnouncement(translatedInstruction, status: status)
+        print("NavigationManager: 🔊 Speaking: \"\(translatedInstruction)\"")
         
-        // Check for destination arrival AFTER TTS (matching Android)
-        if instruction.contains("Arrived! Destination") || instruction.lowercased().contains("arrived") {
+        // Handle destination reached
+        if status == "destination_reached" {
             print("NavigationManager: 🎉 Destination reached!")
-            // Give TTS time to speak, then stop
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
             await MainActor.run {
-                stopNavigation()
+                navigationState.isNavigating = false
             }
         }
     }
     
     // MARK: - Instruction Announcement (MATCHING ANDROID)
     
-    private func handleInstructionAnnouncement(_ instruction: String, isFirst: Bool = false) {
+    private func handleInstructionAnnouncement(_ instruction: String, status: String = "") {
         let lowerInstruction = instruction.lowercased().trimmingCharacters(in: .whitespaces)
         
-        // MATCHING ANDROID skip phrases exactly
+        // Skip filler phrases
         let skipPhrases = [
-            "no value return",
-            "you are on track",
-            "pas de valeur de retour",
-            "aucune valeur de retour",
-            "valeur de retour",
-            "on track",
-            "vous êtes sur la bonne voie",
-            "sur la bonne voie",
-            "press start",
-            "update received",
-            "position updated"
+            "continue moving",
+            "keep going",
+            "you're on track",
+            "on the right path"
         ]
         
-        if skipPhrases.contains(where: { lowerInstruction.contains($0) }) || instruction.trimmingCharacters(in: .whitespaces).isEmpty {
-            print("NavigationManager: Filtered skip phrase: '\(instruction)'")
+        if skipPhrases.contains(where: { lowerInstruction.contains($0) }) {
             return
         }
         
-        // Don't repeat same instruction
-        if instruction == lastInstructionText && !isFirst {
-            return
-        }
-        
-        lastInstructionText = instruction
-        
-        // Check timing
-        let timeSinceLast = Date().timeIntervalSince(lastInstructionTime)
-        guard isFirst || timeSinceLast >= minInstructionInterval else { return }
-        
-        lastInstructionTime = Date()
-        
-        print("NavigationManager: 🔊 Speaking: \"\(instruction)\"")
-        
-        // Use appropriate TTS priority (matching Android)
+        // Emergency corrections: highest priority
         if ttsManager?.isEmergencyCorrection(instruction) == true {
             ttsManager?.speakEmergencyCorrection(instruction)
-        } else if isFirst {
-            ttsManager?.speak(instruction, force: true)
+            return
+        }
+        
+        // Determine if this needs priority treatment
+        let isTurnInstruction = lowerInstruction.contains("turn") &&
+            (lowerInstruction.contains("o'clock") ||
+             lowerInstruction.contains("left") ||
+             lowerInstruction.contains("right"))
+        
+        let isDestination = lowerInstruction.contains("arrived") ||
+            lowerInstruction.contains("destination")
+        
+        let isSegmentTransition = (status == "segment_change" ||
+                                    status == "no_segment_ending" ||
+                                    status == "destination_reached")
+        
+        if isTurnInstruction || isDestination || isSegmentTransition {
+            ttsManager?.speakPriority(instruction)
         } else {
             ttsManager?.speak(instruction)
         }
@@ -677,7 +679,6 @@ class NavigationManager: ObservableObject {
     private func updateCurrentSegmentId(_ segmentId: Int) {
         if segmentId != currentSegmentId {
             currentSegmentId = segmentId
-            // Update sensor manager so next step uses correct bearing
             sensorManager?.setBearingCorrectionData(pathBearings, segmentId)
             print("NavigationManager: Segment updated to \(segmentId)")
         }
@@ -692,14 +693,11 @@ class NavigationManager: ObservableObject {
         let mapX = newMapPosition[0]
         let mapY = newMapPosition[1]
         
-        // Determine bearing based on reason (matching Android logic)
         let mapBearing: Double?
         switch reason {
         case "segment_ending":
-            // Preserve current bearing for segment endings
             mapBearing = sensorManager?.getCurrentMapPosition()?.bearing
         case "segment_change":
-            // Use current bearing for segment changes too
             mapBearing = sensorManager?.getCurrentMapPosition()?.bearing
         default:
             mapBearing = sensorManager?.getCurrentMapPosition()?.bearing
@@ -707,16 +705,10 @@ class NavigationManager: ObservableObject {
         
         print("NavigationManager: Recalibrating for \(reason) at (\(mapX), \(mapY))")
         
-        // FIX: Use resetPositionOnly() instead of resetPosition().
-        // Full resetPosition() kills the Butterworth filter state, causing the first
-        // 1-2 steps after recalibration to have ~20% lower pvDiff values (filter warmup).
-        // This produces shorter step lengths, accumulating ~0.5m of position lag per segment.
-        // resetPositionOnly() resets x/y/stepCount but preserves filter momentum,
-        // peak/valley detection, and step timing — so step detection continues seamlessly.
+        // resetPositionOnly preserves filter state — no phantom steps after recalibration
         sensorManager?.resetPositionOnly()
-        // FIX: Reset lastStepCount to match the reset stepCount (now 0).
         lastStepCount = 0
-        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms (reduced from 100ms — filter is preserved)
+        try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
         
         guard let resetPosition = sensorManager?.getCurrentPosition() else {
             print("NavigationManager: Failed to get reset position for recalibration")
@@ -734,43 +726,8 @@ class NavigationManager: ObservableObject {
         if success {
             let calibrationType = reason == "segment_ending" ? "position only, bearing preserved" : "position + bearing"
             print("NavigationManager: ✓ \(reason) recalibration successful (\(calibrationType))")
-            
-            await MainActor.run {
-                navigationState.currentInstruction = "\(response.message ?? "Recalibrated") (Position recalibrated - \(reason))"
-                navigationState.lastUpdateTime = Date()
-            }
         } else {
             print("NavigationManager: ✗ \(reason) recalibration failed")
-            await MainActor.run {
-                navigationState.errorMessage = "\(reason) recalibration failed, continuing with current calibration"
-            }
-        }
-    }
-    
-    /// FIX: Position-only correction without any sensor reset.
-    /// Used for `no_segment_ending` (turn warnings) where the server provides a corrected
-    /// position at the segment endpoint. This snaps the map position forward to compensate
-    /// for any accumulated step length underestimation, without interrupting the filter
-    /// or step detection state. The user keeps walking seamlessly while the position
-    /// correction ensures the next segment_change triggers at the right time.
-    private func handlePositionOnlyCorrection(mapX: Double, mapY: Double, mapBearing: Double?) async {
-        guard let currentPos = sensorManager?.getCurrentPosition() else {
-            print("NavigationManager: ⚠️ Position-only correction failed — no current position")
-            return
-        }
-        
-        let success = calibrationManager?.calibrateWithMapPosition(
-            currentImuPosition: currentPos,
-            mapX: mapX,
-            mapY: mapY,
-            mapBearing: mapBearing,
-            stepCount: sensorManager?.imuState.stepCount ?? 0
-        ) ?? false
-        
-        if success {
-            print("NavigationManager: ✓ Position-only correction applied to (\(String(format: "%.2f", mapX)), \(String(format: "%.2f", mapY)))")
-        } else {
-            print("NavigationManager: ✗ Position-only correction failed")
         }
     }
     

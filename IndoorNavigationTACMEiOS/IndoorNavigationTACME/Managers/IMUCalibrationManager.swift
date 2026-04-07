@@ -93,7 +93,7 @@ class IMUCalibrationManager: ObservableObject {
         // Calculate confidence
         let confidence = calculateConfidence(stepCount: stepCount, timeElapsed: 0)
         
-        calibrationState = CalibrationState(
+        let newState = CalibrationState(
             isPositionCalibrated: true,
             isBearingCalibrated: isBearingCalibrated || calibrationState.isBearingCalibrated,
             positionOffsetX: offsetX,
@@ -104,6 +104,9 @@ class IMUCalibrationManager: ObservableObject {
             permanentBearingOffset: calibrationState.permanentBearingOffset,
             initialBearing: calibrationState.initialBearing ?? mapBearing
         )
+        DispatchQueue.main.async { [weak self] in
+            self?.calibrationState = newState
+        }
         
         lastKnownImuPosition = currentImuPosition
         
@@ -202,7 +205,10 @@ class IMUCalibrationManager: ObservableObject {
     
     /// Reset calibration state
     func resetCalibration() {
-        calibrationState = CalibrationState()
+        let reset = CalibrationState()
+        DispatchQueue.main.async { [weak self] in
+            self?.calibrationState = reset
+        }
         lastKnownImuPosition = Position()
         print("IMUCalibrationManager: Calibration reset")
     }

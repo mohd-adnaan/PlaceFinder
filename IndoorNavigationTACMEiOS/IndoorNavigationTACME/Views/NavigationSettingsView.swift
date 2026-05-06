@@ -244,6 +244,38 @@ struct NavigationSettingsView: View {
             .padding()
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
+
+            // VoiceOver compatibility toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("VoiceOver Compatibility", systemImage: "accessibility")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.teal)
+
+                    Text("Use VoiceOver announcements to avoid double speech")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: Binding(
+                    get: { ttsManager.ttsState.voiceOverCompatibilityEnabled },
+                    set: { newValue in
+                        ttsManager.setVoiceOverCompatibilityEnabled(newValue)
+                        let message = newValue
+                            ? "VoiceOver compatibility enabled"
+                            : "VoiceOver compatibility disabled"
+                        ttsManager.speak(message, force: true)
+                    }
+                ))
+                .labelsHidden()
+                .toggleStyle(SwitchToggleStyle(tint: .teal))
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
         }
     }
 

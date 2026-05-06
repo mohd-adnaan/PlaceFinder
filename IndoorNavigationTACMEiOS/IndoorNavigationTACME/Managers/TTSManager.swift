@@ -8,6 +8,7 @@
 import Foundation
 import AVFoundation
 import Combine
+import UIKit
 
 /// Manages text-to-speech for navigation instructions
 final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate, @unchecked Sendable {
@@ -22,6 +23,8 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     
     private let synthesizer = AVSpeechSynthesizer()
     private var languageManager: LanguageManager?
+    private let voiceOverCompatibilityKey = "voiceOverCompatibilityMode"
+    private var voiceOverAnnouncementWorkItem: DispatchWorkItem?
     
     // Timing configuration
     private var minTimeBetweenRegularInstructions: TimeInterval = 3.0
@@ -68,6 +71,8 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         synthesizer.delegate = self
         setupAudioSession()
         ttsState.isReady = true
+        ttsState.voiceOverCompatibilityEnabled = UserDefaults.standard.bool(forKey: voiceOverCompatibilityKey)
+        observeVoiceOverStatus()
         print("TTSManager: Initialized")
     }
     
@@ -166,6 +171,8 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     /// Stop current speech
     func stop() {
         synthesizer.stopSpeaking(at: .immediate)
+        voiceOverAnnouncementWorkItem?.cancel()
+        voiceOverAnnouncementWorkItem = nil
         DispatchQueue.main.async {
             self.ttsState.isSpeaking = false
         }
@@ -199,6 +206,24 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         }
         
         print("TTSManager: \(enabled ? "Enabled" : "Disabled")")
+    }
+
+    /// Enable or disable VoiceOver compatibility mode
+    func setVoiceOverCompatibilityEnabled(_ enabled: Bool) {
+        if Thread.isMainThread {
+            ttsState.voiceOverCompatibilityEnabled = enabled
+        } else {
+            DispatchQueue.main.async {
+                self.ttsState.voiceOverCompatibilityEnabled = enabled
+            }
+        }
+        UserDefaults.standard.set(enabled, forKey: voiceOverCompatibilityKey)
+
+        if enabled && UIAccessibility.isVoiceOverRunning {
+            stop()
+        }
+
+        print("TTSManager: VoiceOver compatibility \(enabled ? "Enabled" : "Disabled")")
     }
     
     /// Reset one-time instruction tracking
@@ -245,8 +270,9 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         lastNormalizedInstruction = ""
         lastTimedNeverMissInstructionTimes.removeAll()
         spokenOneTimeInstructions.removeAll()
+        let voiceOverEnabled = UserDefaults.standard.bool(forKey: voiceOverCompatibilityKey)
         DispatchQueue.main.async {
-            self.ttsState = TTSState()
+            self.ttsState = TTSState(voiceOverCompatibilityEnabled: voiceOverEnabled)
         }
         print("TTSManager: Cleaned up")
     }
@@ -264,6 +290,11 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     }
     
     private func performSpeak(_ text: String) {
+        if shouldUseVoiceOverAnnouncements() {
+            postVoiceOverAnnouncement(text)
+            return
+        }
+
         setupAudioSession()
 
         // Get appropriate voice based on language
@@ -297,6 +328,52 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         
         print("TTSManager: Voice=\(voice?.identifier ?? "unknown") name=\(voice?.name ?? "unknown") language=\(voice?.language ?? "unknown")")
         print("TTSManager: Speaking: \(text)")
+    }
+
+    private func shouldUseVoiceOverAnnouncements() -> Bool {
+        return ttsState.voiceOverCompatibilityEnabled && UIAccessibility.isVoiceOverRunning
+    }
+
+    private func postVoiceOverAnnouncement(_ text: String) {
+        UIAccessibility.post(notification: .announcement, argument: text)
+
+        DispatchQueue.main.async {
+            self.ttsState.isSpeaking = true
+            self.ttsState.lastSpokenText = text
+            self.ttsState.lastSpeechTime = Date()
+        }
+
+        scheduleVoiceOverAnnouncementEnd(for: text)
+        print("TTSManager: VoiceOver announcement: \(text)")
+    }
+
+    private func scheduleVoiceOverAnnouncementEnd(for text: String) {
+        voiceOverAnnouncementWorkItem?.cancel()
+
+        let estimatedDuration = estimatedSpeechDuration(for: text)
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.ttsState.isSpeaking = false
+        }
+        voiceOverAnnouncementWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + estimatedDuration, execute: workItem)
+    }
+
+    private func estimatedSpeechDuration(for text: String) -> TimeInterval {
+        let wordCount = max(1, text.split(separator: " ").count)
+        return min(12.0, max(1.4, Double(wordCount) * 0.32))
+    }
+
+    private func observeVoiceOverStatus() {
+        NotificationCenter.default.addObserver(
+            forName: UIAccessibility.voiceOverStatusDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            if self.shouldUseVoiceOverAnnouncements(), self.ttsState.isSpeaking {
+                self.stop()
+            }
+        }
     }
 
     private func preferredZoeVoice() -> AVSpeechSynthesisVoice? {

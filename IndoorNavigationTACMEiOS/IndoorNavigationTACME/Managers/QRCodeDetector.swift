@@ -10,7 +10,7 @@ import UIKit
 import Combine
 
 /// Manages QR code detection for indoor navigation position correction
-class QRCodeDetector: NSObject, ObservableObject {
+class QRCodeDetector: NSObject, ObservableObject, @unchecked Sendable {
     
     // MARK: - Published Properties
     

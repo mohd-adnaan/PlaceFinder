@@ -350,6 +350,7 @@ enum InitStep: String, CaseIterable {
 struct TTSState {
     var isReady: Bool
     var isEnabled: Bool
+    var voiceOverCompatibilityEnabled: Bool
     var isSpeaking: Bool
     var lastSpokenText: String
     var lastSpeechTime: Date?
@@ -357,12 +358,14 @@ struct TTSState {
     init(
         isReady: Bool = false,
         isEnabled: Bool = true,
+        voiceOverCompatibilityEnabled: Bool = false,
         isSpeaking: Bool = false,
         lastSpokenText: String = "",
         lastSpeechTime: Date? = nil
     ) {
         self.isReady = isReady
         self.isEnabled = isEnabled
+        self.voiceOverCompatibilityEnabled = voiceOverCompatibilityEnabled
         self.isSpeaking = isSpeaking
         self.lastSpokenText = lastSpokenText
         self.lastSpeechTime = lastSpeechTime

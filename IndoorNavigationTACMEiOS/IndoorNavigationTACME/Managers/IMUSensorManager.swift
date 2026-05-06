@@ -889,7 +889,7 @@ class UserStepFactorCalibration {
 /// Stores samples and allows retroactive marking of peaks, valleys, and confirmed steps.
 class AccelerationLogger {
     private var samples: [AccelerationSample] = []
-    private let maxSamples = 10000
+    private let maxSamples = 100000
     private var sampleCounter: Int = 0
     
     func addSample(_ sample: AccelerationSample) {

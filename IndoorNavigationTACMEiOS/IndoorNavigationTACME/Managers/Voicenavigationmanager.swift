@@ -440,7 +440,7 @@ class VoiceNavigationManager: ObservableObject {
 
         case .confirmingDestination:
             if isPositiveResponse(text) {
-                showFinalConfirmation()
+                completeVoiceInput()
             } else if isNegativeResponse(text) {
                 retryInput("destination", mode: .listeningDestination,
                            prompt: "Again. Where do you want to go?")

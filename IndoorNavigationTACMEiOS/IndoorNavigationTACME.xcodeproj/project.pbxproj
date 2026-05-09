@@ -19,6 +19,7 @@
 		5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */; };
 		5FE9BCD02F5D38B2009F4503 /* Landingpageview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */; };
 		5FE9BCD42F5D38FF009F4503 /* Voicenavigationmanager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */; };
+		A10000010000000000000023 /* LogWebAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000023 /* LogWebAppService.swift */; };
 		A10000010000000000000001 /* IndoorNavigationTACMEApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* IndoorNavigationTACMEApp.swift */; };
 		A10000010000000000000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* Models.swift */; };
 		A10000010000000000000003 /* NavigationAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* NavigationAPIService.swift */; };
@@ -54,6 +55,7 @@
 		5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config_EXAPMLE.xcconfig; sourceTree = "<group>"; };
 		5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Landingpageview.swift; sourceTree = "<group>"; };
 		5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voicenavigationmanager.swift; sourceTree = "<group>"; };
+		A20000010000000000000023 /* LogWebAppService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogWebAppService.swift; sourceTree = "<group>"; };
 		A20000010000000000000001 /* IndoorNavigationTACMEApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorNavigationTACMEApp.swift; sourceTree = "<group>"; };
 		A20000010000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A20000010000000000000003 /* NavigationAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationAPIService.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 				5FB48BF12F4D445B00D733AB /* OpenAIService.swift */,
 				A20000010000000000000003 /* NavigationAPIService.swift */,
 				A20000010000000000000004 /* GeminiService.swift */,
+				A20000010000000000000023 /* LogWebAppService.swift */,
 			);
 			path = Network;
 			sourceTree = "<group>";
@@ -271,6 +274,7 @@
 				A10000010000000000000002 /* Models.swift in Sources */,
 				5F3F2D7D2F678F3C008261F0 /* DebugLogger.swift in Sources */,
 				A10000010000000000000003 /* NavigationAPIService.swift in Sources */,
+				A10000010000000000000023 /* LogWebAppService.swift in Sources */,
 				A10000010000000000000004 /* GeminiService.swift in Sources */,
 				A10000010000000000000005 /* IMUSensorManager.swift in Sources */,
 				A10000010000000000000006 /* IMUCalibrationManager.swift in Sources */,

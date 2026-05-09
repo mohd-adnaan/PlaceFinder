@@ -252,6 +252,9 @@ struct DebugOverlayView: View {
             exportURLs = [url]
             showExportSheet = true
         }
+        Task {
+            _ = await DataExportManager.shared.uploadDebugLogs()
+        }
     }
     
     private func exportFullBundle() {
@@ -262,6 +265,12 @@ struct DebugOverlayView: View {
         if !urls.isEmpty {
             exportURLs = urls
             showExportSheet = true
+        }
+        Task {
+            _ = await DataExportManager.shared.uploadFullResearchBundle(
+                sensorManager: sensorManager,
+                navigationManager: navigationManager
+            )
         }
     }
     

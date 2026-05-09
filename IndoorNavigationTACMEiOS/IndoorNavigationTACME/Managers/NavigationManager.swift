@@ -61,6 +61,7 @@ class NavigationManager: ObservableObject {
     
     // Retry tracking
     private var retryCount: Int = 0
+    private var didUploadSession: Bool = false
     
     // MARK: - Init
     
@@ -250,6 +251,7 @@ class NavigationManager: ObservableObject {
         lastInstructionTime = Date.distantPast
         updateCount = 0
         retryCount = 0
+        didUploadSession = false
         
         await MainActor.run {
             navigationState.isCalibrated = true
@@ -304,6 +306,8 @@ class NavigationManager: ObservableObject {
         }
         
         ttsManager?.speakPriority("Navigation stopped")
+
+        triggerAutoUpload(reason: "stop_navigation")
         
         sensorManager?.resetPosition()
         calibrationManager?.resetCalibration()
@@ -625,9 +629,27 @@ class NavigationManager: ObservableObject {
         // Handle destination reached
         if status == "destination_reached" {
             print("NavigationManager: 🎉 Destination reached!")
+            triggerAutoUpload(reason: "destination_reached")
             await MainActor.run {
                 navigationState.isNavigating = false
             }
+        }
+    }
+
+    // MARK: - Auto Upload
+
+    private func triggerAutoUpload(reason: String) {
+        guard !didUploadSession else { return }
+        guard let sensorManager = sensorManager else { return }
+
+        didUploadSession = true
+        DebugLogger.shared.log(.export, .info, "Auto upload: \(reason)")
+
+        Task {
+            _ = await DataExportManager.shared.uploadFullResearchBundle(
+                sensorManager: sensorManager,
+                navigationManager: self
+            )
         }
     }
     

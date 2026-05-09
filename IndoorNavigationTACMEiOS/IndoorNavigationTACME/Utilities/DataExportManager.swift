@@ -15,6 +15,11 @@ class DataExportManager: @unchecked Sendable {
     
     static let shared = DataExportManager()
     private init() {}
+    private let isoFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
     
     // MARK: - Step Data CSV Export (Android parity)
     
@@ -213,5 +218,160 @@ class DataExportManager: @unchecked Sendable {
         }
         
         presenter.present(activityVC, animated: true)
+    }
+
+    // MARK: - Sheet Upload
+
+    func uploadDebugLogs() async -> Bool {
+        let payload = buildDebugLogsPayload()
+        return await LogWebAppService.shared.postLog(
+            level: LogLevel.info.rawValue,
+            message: "iOS Debug Logs Export",
+            meta: payload
+        )
+    }
+
+    func uploadFullResearchBundle(
+        sensorManager: IMUSensorManager,
+        navigationManager: NavigationManager
+    ) async -> Bool {
+        let payload = buildFullResearchPayload(
+            sensorManager: sensorManager,
+            navigationManager: navigationManager
+        )
+        return await LogWebAppService.shared.postLog(
+            level: LogLevel.info.rawValue,
+            message: "iOS Full Research Export",
+            meta: payload
+        )
+    }
+
+    private func buildDebugLogsPayload() -> [String: Any] {
+        let entries = DebugLogger.shared.entries.map { buildDebugEntryPayload($0) }
+
+        return [
+            "exportedAt": isoFormatter.string(from: Date()),
+            "entryCount": entries.count,
+            "entries": entries,
+            "text": DebugLogger.shared.exportLogsAsText()
+        ]
+    }
+
+    private func buildFullResearchPayload(
+        sensorManager: IMUSensorManager,
+        navigationManager: NavigationManager
+    ) -> [String: Any] {
+        let samples = sensorManager.getAccelerationSamples()
+        let metrics = normalizeDictionary(sensorManager.getStepDetectionMetrics())
+        let bearingStats = normalizeDictionary(sensorManager.getBearingCorrectionStats())
+        let sensorStatus = normalizeDictionary(sensorManager.getSensorStatus())
+        let loggerStats = sensorManager.getAccelerationLoggerStatistics()
+        let summary = normalizeDictionary(navigationManager.getNavigationSummary())
+        let entries = DebugLogger.shared.entries.map { buildDebugEntryPayload($0) }
+
+        return [
+            "exportedAt": isoFormatter.string(from: Date()),
+            "stepData": [
+                "sampleCount": samples.count,
+                "samples": samples.map { buildAccelerationSamplePayload($0) }
+            ],
+            "stepMetrics": metrics,
+            "bearingStats": bearingStats,
+            "sensorStatus": sensorStatus,
+            "loggerStats": [
+                "totalSamples": loggerStats.totalSamples,
+                "peakCount": loggerStats.peakCount,
+                "valleyCount": loggerStats.valleyCount,
+                "confirmedStepCount": loggerStats.confirmedStepCount,
+                "timeSpanMs": loggerStats.timeSpanMs
+            ],
+            "navigationSummary": summary,
+            "debugLogs": [
+                "entryCount": entries.count,
+                "entries": entries,
+                "text": DebugLogger.shared.exportLogsAsText()
+            ]
+        ]
+    }
+
+    private func buildAccelerationSamplePayload(_ sample: AccelerationSample) -> [String: Any] {
+        var payload: [String: Any] = [
+            "sampleIndex": sample.sampleIndex,
+            "timestamp": isoFormatter.string(from: sample.timestamp),
+            "x": sample.x,
+            "y": sample.y,
+            "z": sample.z,
+            "magnitude": sample.magnitude,
+            "filtered": sample.filtered,
+            "isPeak": sample.isPeak,
+            "isValley": sample.isValley,
+            "isConfirmedStep": sample.isConfirmedStep
+        ]
+
+        if let stepLength = sample.stepLength {
+            payload["stepLength"] = stepLength
+        }
+        if let stepNumber = sample.stepNumber {
+            payload["stepNumber"] = stepNumber
+        }
+        if let peakValleyDiff = sample.peakValleyDiff {
+            payload["peakValleyDiff"] = peakValleyDiff
+        }
+
+        return payload
+    }
+
+    private func buildDebugEntryPayload(_ entry: DebugLogEntry) -> [String: Any] {
+        var payload: [String: Any] = [
+            "timestamp": isoFormatter.string(from: entry.timestamp),
+            "category": entry.category.rawValue,
+            "level": entry.level.rawValue,
+            "message": entry.message
+        ]
+
+        if let detail = entry.detail {
+            payload["detail"] = detail
+        }
+
+        return payload
+    }
+
+    private func normalizeDictionary(_ dict: [String: Any]) -> [String: Any] {
+        var output: [String: Any] = [:]
+        for (key, value) in dict {
+            output[key] = normalizeValue(value)
+        }
+        return output
+    }
+
+    private func normalizeValue(_ value: Any) -> Any {
+        switch value {
+        case let date as Date:
+            return isoFormatter.string(from: date)
+        case let array as [Any]:
+            return array.map { normalizeValue($0) }
+        case let slice as ArraySlice<Double>:
+            return Array(slice)
+        case let slice as ArraySlice<Int>:
+            return Array(slice)
+        case let slice as ArraySlice<String>:
+            return Array(slice)
+        case let slice as ArraySlice<Bool>:
+            return Array(slice)
+        case let dict as [String: Any]:
+            return normalizeDictionary(dict)
+        case let number as NSNumber:
+            return number
+        case let string as String:
+            return string
+        case let bool as Bool:
+            return bool
+        case let int as Int:
+            return int
+        case let double as Double:
+            return double
+        default:
+            return String(describing: value)
+        }
     }
 }

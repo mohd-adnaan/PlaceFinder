@@ -280,7 +280,19 @@ class IMUSensorManager: ObservableObject {
         imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
         imuState.isCalibrating = false
     }
-    
+
+    /// Wipe the persisted step-factor calibration. Call before handing the device
+    /// to a new user so they can recalibrate for their own gait. Resets `imuState`
+    /// to reflect the cleared values immediately.
+    func clearStepCalibration() {
+        stepFactorCalibration.clearPersisted()
+        imuState.beta = stepFactorCalibration.getUserBeta()
+        imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
+        imuState.isCalibrating = false
+        imuState.calibrationStepCount = 0
+        print("IMUSensorManager: Step calibration cleared — beta reset to \(imuState.beta)")
+    }
+
     func getStepDetectionMetrics() -> [String: Any] {
         return [
             "totalSteps": stepCount,
@@ -862,6 +874,29 @@ class UserStepFactorCalibration {
         UserDefaults.standard.set(calibratedBeta, forKey: calibrationBetaKey)
         UserDefaults.standard.set(isValid, forKey: calibrationValidKey)
         UserDefaults.standard.set(calibratedAvgPvDiff, forKey: calibrationAvgPvDiffKey)
+    }
+
+    /// Wipe persisted calibration so the device can be handed to a new user.
+    /// Returns the calibration to "first-time use" state — beta falls back to
+    /// `defaultBeta`, isValid becomes false, and the adaptive pvDiff floor is cleared.
+    /// Any in-progress calibration walk is also cancelled.
+    func clearPersisted() {
+        // Cancel any in-progress calibration walk
+        isCalibrating = false
+        userStepCount = 0
+        accumulatedAccelerationDiff = 0
+        calibrationPvDiffs.removeAll()
+
+        // Reset in-memory state to defaults
+        userBeta = defaultBeta
+        calibratedBeta = defaultBeta
+        calibratedAvgPvDiff = 0.0
+        isValid = false
+
+        // Remove from UserDefaults so a fresh launch sees no persisted calibration
+        UserDefaults.standard.removeObject(forKey: calibrationBetaKey)
+        UserDefaults.standard.removeObject(forKey: calibrationValidKey)
+        UserDefaults.standard.removeObject(forKey: calibrationAvgPvDiffKey)
     }
 
     private func loadPersistedCalibration() {

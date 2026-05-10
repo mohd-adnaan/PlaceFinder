@@ -20,11 +20,9 @@ struct DebugOverlayView: View {
     
     @State private var isExpanded: Bool = false
     @State private var selectedCategories: Set<LogCategory> = []
-    @State private var showExportSheet: Bool = false
-    @State private var exportURLs: [URL] = []
     @State private var autoScroll: Bool = true
     @State private var showDetail: DebugLogEntry? = nil
-    
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             // Log panel (shown when expanded)
@@ -39,11 +37,10 @@ struct DebugOverlayView: View {
             // Bug button
             bugButton
         }
-        .sheet(isPresented: $showExportSheet) {
-            if !exportURLs.isEmpty {
-                ActivityViewController(activityItems: exportURLs)
-            }
-        }
+        // Manual share sheet removed: research data uploads directly to Google
+        // Sheets via DataExportManager.upload* / LogWebAppService, so the
+        // UIActivityViewController step was redundant and added a confusing
+        // partial UI on top of the debug overlay.
         .sheet(item: $showDetail) { entry in
             DetailSheet(entry: entry)
         }
@@ -202,29 +199,31 @@ struct DebugOverlayView: View {
     
     private var bottomToolbar: some View {
         HStack(spacing: 12) {
-            // Export step data CSV
+            // Upload step data only (stays as a separate quick action so a
+            // researcher debugging step detection can push fresh samples
+            // without bundling logs and metrics).
             Button(action: exportStepData) {
-                Label("Steps CSV", systemImage: "tablecells")
+                Label("Upload Steps", systemImage: "tablecells")
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(.cyan)
-            
-            // Export debug logs
+
+            // Upload debug logs only.
             Button(action: exportLogs) {
-                Label("Logs", systemImage: "doc.text")
+                Label("Upload Logs", systemImage: "doc.text")
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(.cyan)
-            
-            // Export full research bundle
+
+            // Upload full research bundle (logs + step data + metrics).
             Button(action: exportFullBundle) {
-                Label("Export All", systemImage: "square.and.arrow.up")
+                Label("Upload All", systemImage: "icloud.and.arrow.up")
                     .font(.system(size: 11, weight: .medium))
             }
             .foregroundColor(.orange)
-            
+
             Spacer()
-            
+
             // Show step metrics
             Button(action: showMetrics) {
                 Label("Metrics", systemImage: "gauge")
@@ -236,44 +235,58 @@ struct DebugOverlayView: View {
         .padding(.vertical, 8)
         .background(Color.white.opacity(0.06))
     }
-    
+
     // MARK: - Actions
-    
+    //
+    // Each "export" action now uploads to the Google Sheets / web-app sink
+    // via DataExportManager / LogWebAppService and logs the outcome to the
+    // in-app debug panel. The previous UIActivityViewController share step
+    // was redundant once the cloud sink existed and is removed.
+
     private func exportStepData() {
+        // Step data is bundled into the full upload, but a researcher may
+        // want just-the-samples for a quick check — so write the CSV (which
+        // is also what makes the data available locally for inspection)
+        // and log how many samples we captured. No share sheet anymore.
         let samples = sensorManager.getAccelerationSamples()
         if let url = DataExportManager.shared.exportStepDataCSV(samples: samples) {
-            exportURLs = [url]
-            showExportSheet = true
+            DebugLogger.shared.log(.export, .success,
+                "Step CSV written (\(samples.count) samples) → \(url.lastPathComponent)")
         }
     }
-    
+
     private func exportLogs() {
+        // Keep the local-file write for offline inspection during dev,
+        // but no share sheet — upload directly.
         if let url = DataExportManager.shared.exportDebugLogs() {
-            exportURLs = [url]
-            showExportSheet = true
+            DebugLogger.shared.log(.export, .info,
+                "Logs file written → \(url.lastPathComponent)")
         }
         Task {
-            _ = await DataExportManager.shared.uploadDebugLogs()
+            let ok = await DataExportManager.shared.uploadDebugLogs()
+            await MainActor.run {
+                DebugLogger.shared.log(.export, ok ? .success : .error,
+                    ok ? "Debug logs uploaded" : "Debug logs upload failed")
+            }
         }
     }
-    
+
     private func exportFullBundle() {
-        let urls = DataExportManager.shared.exportFullResearchBundle(
-            sensorManager: sensorManager,
-            navigationManager: navigationManager
-        )
-        if !urls.isEmpty {
-            exportURLs = urls
-            showExportSheet = true
-        }
+        // Skip the local file dance — uploadFullResearchBundle builds and
+        // sends its own payload directly. (Local files were only kept for
+        // the share sheet, which is gone.)
         Task {
-            _ = await DataExportManager.shared.uploadFullResearchBundle(
+            let ok = await DataExportManager.shared.uploadFullResearchBundle(
                 sensorManager: sensorManager,
                 navigationManager: navigationManager
             )
+            await MainActor.run {
+                DebugLogger.shared.log(.export, ok ? .success : .error,
+                    ok ? "Full research bundle uploaded" : "Full research bundle upload failed")
+            }
         }
     }
-    
+
     private func showMetrics() {
         let metrics = sensorManager.getStepDetectionMetrics()
         let stats = sensorManager.getAccelerationLoggerStatistics()
@@ -425,14 +438,7 @@ private struct DetailSheet: View {
 }
 
 // MARK: - UIKit ActivityViewController wrapper
-
-struct ActivityViewController: UIViewControllerRepresentable {
-    let activityItems: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        let vc = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
-        return vc
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
-}
+//
+// Removed alongside the manual share sheet. Research data uploads to the
+// Google Sheets sink via DataExportManager.upload* / LogWebAppService —
+// the in-app share-sheet wrapper was redundant once that path existed.

@@ -291,6 +291,14 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     
     private func performSpeak(_ text: String) {
         if shouldUseVoiceOverAnnouncements() {
+            // Belt-and-suspenders: a residual AVSpeech utterance from BEFORE
+            // VoiceOver was activated can still be in flight here. Stop it
+            // immediately so the user doesn't get the same content twice
+            // (one from AVSpeech, one from VoiceOver). Without this, toggling
+            // VoiceOver mid-instruction reliably produces double-speech.
+            if synthesizer.isSpeaking {
+                synthesizer.stopSpeaking(at: .immediate)
+            }
             postVoiceOverAnnouncement(text)
             return
         }
@@ -335,7 +343,25 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
     }
 
     private func postVoiceOverAnnouncement(_ text: String) {
-        UIAccessibility.post(notification: .announcement, argument: text)
+        // Wrap the message in an NSAttributedString and set
+        // `accessibilitySpeechQueueAnnouncement: true`. Without this, posting
+        // a plain String can cut OFF in-flight VoiceOver speech (e.g. focus
+        // changes from a SwiftUI view update arriving on the same runloop
+        // tick), or — worse — the announcement itself gets swallowed silently
+        // when VoiceOver is mid-utterance. The queue attribute tells
+        // VoiceOver to finish whatever it's saying first, then deliver our
+        // string. This is the iOS 11+ supported way to avoid the "double /
+        // overlapping speech" problem the user is hitting.
+        let attributed: NSAttributedString
+        if #available(iOS 11.0, *) {
+            attributed = NSAttributedString(
+                string: text,
+                attributes: [.accessibilitySpeechQueueAnnouncement: true]
+            )
+        } else {
+            attributed = NSAttributedString(string: text)
+        }
+        UIAccessibility.post(notification: .announcement, argument: attributed)
 
         DispatchQueue.main.async {
             self.ttsState.isSpeaking = true
@@ -344,7 +370,7 @@ final class TTSManager: NSObject, ObservableObject, AVSpeechSynthesizerDelegate,
         }
 
         scheduleVoiceOverAnnouncementEnd(for: text)
-        print("TTSManager: VoiceOver announcement: \(text)")
+        print("TTSManager: VoiceOver announcement (queued): \(text)")
     }
 
     private func scheduleVoiceOverAnnouncementEnd(for text: String) {

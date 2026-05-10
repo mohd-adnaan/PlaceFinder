@@ -28,6 +28,7 @@ struct NavigationSettingsView: View {
     @Binding var useLandmarks: Bool
     @Binding var voiceControlledMode: Bool
     @State private var didAutoSubmitCurrentCalibration: Bool = false
+    @State private var showClearCalibrationConfirm: Bool = false
 
     private let autoCalibrationDistanceMeters: Double = 20.0
 
@@ -85,6 +86,11 @@ struct NavigationSettingsView: View {
                             sensorManager.stopStepCalibration()
                         }
                     )
+
+                    // Clear-calibration button (for handing the device to a new user).
+                    // Disabled when no calibration is stored to prevent accidental taps,
+                    // but always visible so visually impaired users can find it reliably.
+                    clearCalibrationButton
 
                     // Status indicator
                     StatusIndicatorView(
@@ -208,7 +214,67 @@ struct NavigationSettingsView: View {
                     ttsManager.speakPriority(message)
                 }
             }
+            .alert(
+                languageManager.currentLanguage == .french
+                    ? "Effacer la calibration?"
+                    : "Clear calibration?",
+                isPresented: $showClearCalibrationConfirm
+            ) {
+                Button(
+                    languageManager.currentLanguage == .french ? "Annuler" : "Cancel",
+                    role: .cancel
+                ) { }
+                Button(
+                    languageManager.currentLanguage == .french ? "Effacer" : "Clear",
+                    role: .destructive,
+                    action: performClearCalibration
+                )
+            } message: {
+                Text(
+                    languageManager.currentLanguage == .french
+                        ? "La valeur de calibration enregistrée sera supprimée. Le prochain utilisateur devra recalibrer."
+                        : "The stored calibration value will be removed. The next user will need to recalibrate."
+                )
+            }
         }
+    }
+
+    // MARK: - Clear Calibration Button
+
+    /// Button shown beneath the StepCalibrationCard. Allows the device owner
+    /// (e.g. researcher handing the phone to a new participant) to wipe the
+    /// stored gait calibration so the next user can calibrate for themselves.
+    /// Disabled-but-visible when no calibration is stored, so it remains
+    /// findable by VoiceOver users without firing accidentally.
+    private var clearCalibrationButton: some View {
+        let isCalibrated = sensorManager.imuState.isStepCalibrationValid
+        let isFrench = languageManager.currentLanguage == .french
+        let title = isCalibrated
+            ? (isFrench ? "Effacer la calibration enregistrée" : "Clear Saved Calibration")
+            : (isFrench ? "Aucune calibration enregistrée" : "No Saved Calibration")
+        let hint = isFrench
+            ? "Supprime la valeur de calibration. À utiliser avant de remettre l'appareil à un nouvel utilisateur."
+            : "Removes the stored calibration. Use before handing the device to a new user."
+
+        return Button(action: { showClearCalibrationConfirm = true }) {
+            HStack(spacing: 10) {
+                Image(systemName: "trash")
+                    .font(.subheadline)
+                Text(title)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Spacer()
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(Color.red.opacity(isCalibrated ? 0.12 : 0.05))
+            .foregroundColor(isCalibrated ? .red : .gray)
+            .cornerRadius(10)
+        }
+        .disabled(!isCalibrated)
+        .accessibilityLabel(title)
+        .accessibilityHint(hint)
     }
 
     // MARK: - Mode Section
@@ -309,6 +375,19 @@ struct NavigationSettingsView: View {
                 print("Navigation start failed: \(error)")
             }
         }
+    }
+
+    /// Wipe the persisted gait calibration and announce the result.
+    /// Triggered from the destructive option in the clear-calibration alert.
+    private func performClearCalibration() {
+        sensorManager.clearStepCalibration()
+        didAutoSubmitCurrentCalibration = false
+
+        let isFrench = languageManager.currentLanguage == .french
+        let message = isFrench
+            ? "Calibration effacée. Le prochain utilisateur devra calibrer en marchant 20 mètres."
+            : "Calibration cleared. The next user will need to calibrate by walking 20 meters."
+        ttsManager.speakPriority(message)
     }
 
     private func resetAll() {

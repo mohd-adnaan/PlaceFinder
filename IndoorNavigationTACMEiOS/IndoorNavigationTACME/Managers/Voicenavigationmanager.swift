@@ -48,6 +48,12 @@ class VoiceNavigationManager: ObservableObject {
 
     @Published var voiceInputState = VoiceInputState()
 
+    /// 0…1 microphone RMS, updated in real time while listening.
+    /// Drives the audio-reactive particle orb on the landing page so blind
+    /// users still get sighted-companion visual feedback (and so the orb
+    /// matches the responsiveness sighted users expect from voice UIs).
+    @Published var audioLevel: Float = 0.0
+
     // MARK: - Private Properties
 
     private var speechRecognizer: SFSpeechRecognizer?
@@ -113,11 +119,40 @@ class VoiceNavigationManager: ObservableObject {
 
     // MARK: - Public Methods
 
-    func startVoiceInput(poiNames: [String]) {
+    /// Begin the voice-driven source/destination capture flow.
+    /// - Parameters:
+    ///   - poiNames: Resolvable POI names from the current map.
+    ///   - isStepCalibrated: Whether the device has a valid stored gait calibration.
+    ///                       When `false`, the flow is aborted with a spoken instruction
+    ///                       telling the user to calibrate first — voice navigation
+    ///                       depends on accurate step length, so starting before
+    ///                       calibration produces unreliable distance estimates.
+    ///                       Defaults to `true` to preserve any existing call sites.
+    func startVoiceInput(poiNames: [String], isStepCalibrated: Bool = true) {
         availablePOIs = poiNames
         tempSource = ""
         tempDestination = ""
         sessionCounter += 1
+
+        let isFrench = languageManager?.currentLanguage == .french
+
+        // ─── Calibration gate ────────────────────────────────────────────
+        // First-time users (no stored beta) must calibrate before navigation,
+        // otherwise step distances are estimated from the default factor and
+        // the route falls out of sync within a few segments. Speak a clear
+        // instruction and stay idle so a single tap doesn't fight the prompt.
+        if !isStepCalibrated {
+            voiceInputState = VoiceInputState()
+            voiceInputState.currentMode = .idle
+            voiceInputState.debugInfo = "Calibration required before voice navigation"
+
+            let calibrationPrompt = isFrench
+                ? "Calibration requise. Veuillez ouvrir les paramètres et marcher vingt mètres pour calibrer votre démarche, puis réessayez."
+                : "Calibration required. Please open settings and walk twenty meters to calibrate your stride, then try again."
+            ttsManager?.speakPriority(calibrationPrompt)
+            print("VoiceNavigationManager: Calibration gate triggered — flow aborted")
+            return
+        }
 
         voiceInputState = VoiceInputState()
         voiceInputState.isReady = true
@@ -125,7 +160,6 @@ class VoiceNavigationManager: ObservableObject {
         voiceInputState.isInstructing = true
         voiceInputState.debugInfo = "Starting voice navigation setup"
 
-        let isFrench = languageManager?.currentLanguage == .french
         let prompt = isFrench
             ? "Quel est votre lieu de départ?"
             : "What is your starting location?"
@@ -237,9 +271,23 @@ class VoiceNavigationManager: ObservableObject {
         }
 
         // ─── Step 4: Install audio tap ───
+        // Tap pulls every microphone buffer. We forward it to the recognizer
+        // and ALSO compute a per-buffer RMS, which the LandingPageView orb
+        // reads to drive its breathing animation. Same scaling as
+        // ConversationManager (rms * 15) so the two managers feel uniform.
         inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) {
             [weak self] buffer, _ in
             self?.recognitionRequest?.append(buffer)
+
+            guard let self = self,
+                  let data = buffer.floatChannelData?[0] else { return }
+            let count = Int(buffer.frameLength)
+            guard count > 0 else { return }
+            var sum: Float = 0
+            vDSP_svesq(data, 1, &sum, vDSP_Length(count))
+            let rms   = sqrtf(sum / Float(count))
+            let level = min(rms * 15.0, 1.0)
+            DispatchQueue.main.async { self.audioLevel = level }
         }
 
         // ─── Step 5: Start engine ───
@@ -343,6 +391,9 @@ class VoiceNavigationManager: ObservableObject {
         recognitionTask = nil
 
         voiceInputState.isListening = false
+        // Reset orb-driving level so the particle animation falls back to
+        // its idle breath rather than freezing at the last seen value.
+        audioLevel = 0
     }
 
     // MARK: - Silence Timer
@@ -872,3 +923,6 @@ class VoiceNavigationManager: ObservableObject {
         DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
     }
 }
+
+// vDSP import for RMS calculation (audio-reactive orb)
+import Accelerate

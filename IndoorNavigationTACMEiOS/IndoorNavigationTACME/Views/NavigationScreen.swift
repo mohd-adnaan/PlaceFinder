@@ -91,45 +91,54 @@ struct NavigationScreen: View {
                     .cornerRadius(16)
                 }
 
-                // Navigation controls row
-                HStack(spacing: 16) {
-                    // Stop button
+                // Navigation controls — large stacked buttons sized for blind/low-vision
+                // users to find by touch. Vertical layout gives each button the full
+                // width of the screen rather than a quarter, and the 64pt minimum
+                // height clears Apple's 44pt accessible-target guideline with margin.
+                VStack(spacing: 12) {
+                    // Stop button — destructive, top of stack so it's reachable
+                    // with a single thumb sweep from the bottom of the device.
                     Button(action: {
                         navigationManager.stopNavigation()
                         conversationManager.stopConversationMode()
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 12) {
                             Image(systemName: "stop.fill")
-                            Text("Stop")
+                                .font(.title2)
+                            Text("Stop Navigation")
+                                .font(.title3)
                                 .fontWeight(.semibold)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
+                        .frame(maxWidth: .infinity, minHeight: 64)
                         .background(Color.red)
                         .foregroundColor(.white)
-                        .cornerRadius(12)
+                        .cornerRadius(14)
                     }
                     .accessibilityLabel("Stop navigation")
+                    .accessibilityHint("Ends the current route and exits voice navigation.")
 
-                    // Repeat instruction button
+                    // Repeat instruction button — large secondary control.
                     Button(action: {
                         ttsManager.repeatLastInstruction()
                     }) {
-                        HStack(spacing: 6) {
+                        HStack(spacing: 12) {
                             Image(systemName: "arrow.clockwise")
-                            Text("Repeat")
+                                .font(.title2)
+                            Text("Repeat Instruction")
+                                .font(.title3)
                                 .fontWeight(.medium)
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 12)
-                        .background(Color.purple.opacity(0.15))
+                        .frame(maxWidth: .infinity, minHeight: 64)
+                        .background(Color.purple.opacity(0.18))
                         .foregroundColor(.purple)
-                        .cornerRadius(12)
+                        .cornerRadius(14)
                     }
                     .accessibilityLabel("Repeat last instruction")
+                    .accessibilityHint("Speaks the most recent navigation instruction again.")
                 }
 
-                // Segment / bearing info
+                // Segment / bearing info — sighted-debug only; hidden from VoiceOver
+                // so blind users don't have to scroll past it to reach controls.
                 if navigationManager.navigationState.currentSegmentId >= 0 {
                     HStack {
                         Text("Segment: \(navigationManager.navigationState.currentSegmentId)")
@@ -157,6 +166,7 @@ struct NavigationScreen: View {
                         }
                     }
                     .padding(.horizontal, 4)
+                    .accessibilityHidden(true)
                 }
             }
             .padding(.horizontal, 20)

@@ -5,6 +5,8 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
     @Published var isMapping = false
     @Published var mappingStatus: ARFrame.WorldMappingStatus = .notAvailable
     @Published var savedMapURL: URL?
+    @Published var isRelocalizing = false
+    @Published var isLocalized = false
     
     let session = ARSession()
     
@@ -17,8 +19,10 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal, .vertical]
         config.environmentTexturing = .automatic
+        config.worldAlignment = .gravityAndHeading
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
         isMapping = true
+        isRelocalizing = false
     }
     
     func stopMapping() {
@@ -48,10 +52,47 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         }
     }
     
+    func loadMapAndRelocalize() {
+        let url = getDocumentsDirectory().appendingPathComponent("BuildingMap.arexperience")
+        guard let data = try? Data(contentsOf: url),
+              let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) else {
+            print("❌ No map found at \(url.path)")
+            return
+        }
+        
+        let config = ARWorldTrackingConfiguration()
+        config.initialWorldMap = map
+        config.planeDetection = [.horizontal, .vertical]
+        config.worldAlignment = .gravityAndHeading
+        
+        session.run(config, options: [.resetTracking, .removeExistingAnchors])
+        isRelocalizing = true
+        isMapping = false
+    }
+    
     // MARK: - ARSessionDelegate
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         DispatchQueue.main.async {
             self.mappingStatus = frame.worldMappingStatus
+        }
+    }
+    
+    func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+        DispatchQueue.main.async {
+            if self.isRelocalizing {
+                switch camera.trackingState {
+                case .normal:
+                    if !self.isLocalized {
+                        self.isLocalized = true
+                        print("✅ Successfully relocalized against the map!")
+                    }
+                default:
+                    if self.isLocalized {
+                        self.isLocalized = false
+                        print("⚠️ Lost localization.")
+                    }
+                }
+            }
         }
     }
     

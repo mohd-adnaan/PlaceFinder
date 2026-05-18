@@ -44,19 +44,33 @@ struct ARMappingView: View {
                 }
                 
                 HStack(spacing: 20) {
-                    if !mappingManager.isMapping {
-                        Button(action: {
-                            mappingManager.startMapping()
-                        }) {
-                            Text("Start Mapping")
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.blue)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
+                    if !mappingManager.isMapping && !mappingManager.isRelocalizing {
+                        VStack(spacing: 15) {
+                            Button(action: {
+                                mappingManager.startMapping()
+                            }) {
+                                Text("Start Mapping")
+                                    .bold()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.blue)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                            
+                            Button(action: {
+                                mappingManager.loadMapAndRelocalize()
+                            }) {
+                                Text("Load Map & Relocalize")
+                                    .bold()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.orange)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
                         }
-                    } else {
+                    } else if mappingManager.isMapping {
                         Button(action: {
                             mappingManager.saveMap()
                         }) {
@@ -80,6 +94,18 @@ struct ARMappingView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(12)
                         }
+                    } else if mappingManager.isRelocalizing {
+                        Button(action: {
+                            mappingManager.stopMapping() // Stops the session
+                        }) {
+                            Text("Stop Relocalizing")
+                                .bold()
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                        }
                     }
                 }
                 .padding(.horizontal)
@@ -89,6 +115,18 @@ struct ARMappingView: View {
     }
     
     private var statusText: String {
+        if mappingManager.isRelocalizing {
+            if mappingManager.isLocalized {
+                return "✅ Localized!"
+            } else {
+                return "🔍 Looking for map features..."
+            }
+        }
+        
+        if !mappingManager.isMapping {
+            return "Ready"
+        }
+        
         switch mappingManager.mappingStatus {
         case .notAvailable: return "Not Available"
         case .limited: return "Limited - Move around to scan"

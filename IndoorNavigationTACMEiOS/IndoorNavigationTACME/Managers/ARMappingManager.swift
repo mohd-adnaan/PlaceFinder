@@ -7,6 +7,7 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
     @Published var savedMapURL: URL?
     @Published var isRelocalizing = false
     @Published var isLocalized = false
+    @Published var currentPositionText: String = ""
     
     let session = ARSession()
     
@@ -74,6 +75,17 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         DispatchQueue.main.async {
             self.mappingStatus = frame.worldMappingStatus
+            
+            if self.isLocalized {
+                let transform = frame.camera.transform
+                let x = transform.columns.3.x
+                let z = transform.columns.3.z
+                let yaw = frame.camera.eulerAngles.y * 180 / .pi
+                
+                self.currentPositionText = String(format: "Position: (X: %.2f, Z: %.2f)\nHeading: %.0f°", x, z, yaw)
+            } else {
+                self.currentPositionText = ""
+            }
         }
     }
     

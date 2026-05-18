@@ -34,6 +34,17 @@ struct ARMappingView: View {
                     .foregroundColor(.white)
                     .cornerRadius(10)
                 
+                if !mappingManager.currentPositionText.isEmpty {
+                    Text(mappingManager.currentPositionText)
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .multilineTextAlignment(.center)
+                        .padding()
+                        .background(Color.black.opacity(0.7))
+                        .foregroundColor(.cyan)
+                        .cornerRadius(10)
+                }
+                
                 if let savedURL = mappingManager.savedMapURL {
                     Text("Saved to: \(savedURL.lastPathComponent)")
                         .font(.caption)

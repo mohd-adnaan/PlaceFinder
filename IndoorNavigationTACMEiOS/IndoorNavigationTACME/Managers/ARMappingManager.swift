@@ -8,6 +8,8 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
     @Published var isRelocalizing = false
     @Published var isLocalized = false
     @Published var currentPositionText: String = ""
+    @Published var closestPOI: String?
+    @Published var anchorsList: [String] = []
     
     let session = ARSession()
     
@@ -71,6 +73,18 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         isMapping = false
     }
     
+    func addPOIAnchor(name: String) {
+        guard let currentTransform = session.currentFrame?.camera.transform else { return }
+        // Create an anchor at the current camera position
+        let anchor = ARAnchor(name: name, transform: currentTransform)
+        session.add(anchor: anchor)
+        
+        DispatchQueue.main.async {
+            self.anchorsList.append(name)
+        }
+        print("✅ Added POI Anchor: \(name)")
+    }
+    
     // MARK: - ARSessionDelegate
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         DispatchQueue.main.async {
@@ -82,7 +96,34 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
                 let z = transform.columns.3.z
                 let yaw = frame.camera.eulerAngles.y * 180 / .pi
                 
-                self.currentPositionText = String(format: "Position: (X: %.2f, Z: %.2f)\nHeading: %.0f°", x, z, yaw)
+                // Find closest POI anchor
+                let cameraPos = simd_make_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+                var minDistance: Float = Float.infinity
+                var nearestName: String? = nil
+                
+                for anchor in frame.anchors {
+                    if let name = anchor.name {
+                        let anchorPos = simd_make_float3(anchor.transform.columns.3.x, anchor.transform.columns.3.y, anchor.transform.columns.3.z)
+                        let distance = simd_distance(cameraPos, anchorPos)
+                        if distance < minDistance {
+                            minDistance = distance
+                            nearestName = name
+                        }
+                    }
+                }
+                
+                if minDistance < 5.0 { // If within 5 meters of a POI
+                    if self.closestPOI != nearestName {
+                        self.closestPOI = nearestName
+                    }
+                } else {
+                    if self.closestPOI != nil {
+                        self.closestPOI = nil
+                    }
+                }
+                
+                let poiText = self.closestPOI != nil ? "\nClosest POI: \(self.closestPOI!)" : ""
+                self.currentPositionText = String(format: "Position: (X: %.2f, Z: %.2f)\nHeading: %.0f°%@", x, z, yaw, poiText)
             } else {
                 self.currentPositionText = ""
             }

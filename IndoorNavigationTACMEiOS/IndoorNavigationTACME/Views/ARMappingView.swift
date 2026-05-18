@@ -19,6 +19,7 @@ struct ARViewContainer: UIViewRepresentable {
 
 struct ARMappingView: View {
     @StateObject private var mappingManager = ARMappingManager()
+    @State private var newPOIName: String = ""
     
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -82,29 +83,61 @@ struct ARMappingView: View {
                             }
                         }
                     } else if mappingManager.isMapping {
-                        Button(action: {
-                            mappingManager.saveMap()
-                        }) {
-                            Text("Save Map")
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.green)
+                        if !mappingManager.anchorsList.isEmpty {
+                            Text("Anchors added: \(mappingManager.anchorsList.count)")
+                                .font(.caption)
                                 .foregroundColor(.white)
-                                .cornerRadius(12)
+                                .padding(.horizontal)
                         }
                         
-                        Button(action: {
-                            mappingManager.stopMapping()
-                        }) {
-                            Text("Stop")
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
+                        HStack {
+                            TextField("POI Name (e.g. Entrance)", text: $newPOIName)
+                                .textFieldStyle(RoundedBorderTextFieldStyle())
+                                .foregroundColor(.black)
+                                .padding(.leading)
+                            
+                            Button(action: {
+                                if !newPOIName.isEmpty {
+                                    mappingManager.addPOIAnchor(name: newPOIName)
+                                    newPOIName = ""
+                                }
+                            }) {
+                                Text("Drop POI")
+                                    .bold()
+                                    .padding()
+                                    .background(Color.purple)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                            .padding(.trailing)
                         }
+                        
+                        HStack(spacing: 20) {
+                            Button(action: {
+                                mappingManager.saveMap()
+                            }) {
+                                Text("Save Map")
+                                    .bold()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.green)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                            
+                            Button(action: {
+                                mappingManager.stopMapping()
+                            }) {
+                                Text("Stop")
+                                    .bold()
+                                    .frame(maxWidth: .infinity)
+                                    .padding()
+                                    .background(Color.red)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(12)
+                            }
+                        }
+                        .padding(.horizontal)
                     } else if mappingManager.isRelocalizing {
                         Button(action: {
                             mappingManager.stopMapping() // Stops the session
@@ -119,7 +152,6 @@ struct ARMappingView: View {
                         }
                     }
                 }
-                .padding(.horizontal)
                 .padding(.bottom, 30)
             }
         }

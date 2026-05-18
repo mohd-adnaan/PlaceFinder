@@ -10,6 +10,7 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
     @Published var currentPositionText: String = ""
     @Published var closestPOI: String?
     @Published var anchorsList: [String] = []
+    @Published var mapPOIs: [String: simd_float3] = [:]
     
     let session = ARSession()
     
@@ -63,6 +64,19 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
             return
         }
         
+        DispatchQueue.main.async {
+            self.anchorsList = map.anchors.compactMap { $0.name }
+            self.mapPOIs.removeAll()
+            for anchor in map.anchors {
+                if let name = anchor.name {
+                    self.mapPOIs[name] = simd_make_float3(anchor.transform.columns.3.x, anchor.transform.columns.3.y, anchor.transform.columns.3.z)
+                }
+            }
+            self.isRelocalizing = true
+            self.isMapping = false
+            self.isLocalized = false
+        }
+        
         let config = ARWorldTrackingConfiguration()
         config.initialWorldMap = map
         config.planeDetection = [.horizontal, .vertical]
@@ -79,8 +93,13 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         let anchor = ARAnchor(name: name, transform: currentTransform)
         session.add(anchor: anchor)
         
+        let anchorPos = simd_make_float3(currentTransform.columns.3.x, currentTransform.columns.3.y, currentTransform.columns.3.z)
+        
         DispatchQueue.main.async {
-            self.anchorsList.append(name)
+            if !self.anchorsList.contains(name) {
+                self.anchorsList.append(name)
+            }
+            self.mapPOIs[name] = anchorPos
         }
         print("✅ Added POI Anchor: \(name)")
     }
@@ -96,34 +115,22 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
                 let z = transform.columns.3.z
                 let yaw = frame.camera.eulerAngles.y * 180 / .pi
                 
-                // Find closest POI anchor
+                // Find closest POI directly from our permanent map database
                 let cameraPos = simd_make_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
                 var minDistance: Float = Float.infinity
                 var nearestName: String? = nil
                 
-                for anchor in frame.anchors {
-                    if let name = anchor.name {
-                        let anchorPos = simd_make_float3(anchor.transform.columns.3.x, anchor.transform.columns.3.y, anchor.transform.columns.3.z)
-                        let distance = simd_distance(cameraPos, anchorPos)
-                        if distance < minDistance {
-                            minDistance = distance
-                            nearestName = name
-                        }
+                for (name, pos) in self.mapPOIs {
+                    let distance = simd_distance(cameraPos, pos)
+                    if distance < minDistance {
+                        minDistance = distance
+                        nearestName = name
                     }
                 }
                 
-                if minDistance < 5.0 { // If within 5 meters of a POI
-                    if self.closestPOI != nearestName {
-                        self.closestPOI = nearestName
-                    }
-                } else {
-                    if self.closestPOI != nil {
-                        self.closestPOI = nil
-                    }
-                }
-                
-                let poiText = self.closestPOI != nil ? "\nClosest POI: \(self.closestPOI!)" : ""
-                self.currentPositionText = String(format: "Position: (X: %.2f, Z: %.2f)\nHeading: %.0f°%@", x, z, yaw, poiText)
+                self.closestPOI = nearestName
+                let poiText = nearestName != nil ? "\n📍 Nearest: \(nearestName!) (\(String(format: "%.1f", minDistance))m)" : ""
+                self.currentPositionText = String(format: "X: %.1f, Z: %.1f | HDG: %.0f°%@", x, z, yaw, poiText)
             } else {
                 self.currentPositionText = ""
             }

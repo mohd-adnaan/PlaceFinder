@@ -26,133 +26,105 @@ struct ARMappingView: View {
             ARViewContainer(session: mappingManager.session)
                 .edgesIgnoringSafeArea(.all)
             
-            VStack(spacing: 20) {
-                // Status Indicator
-                Text(statusText)
-                    .font(.headline)
-                    .padding()
-                    .background(Color.black.opacity(0.7))
-                    .foregroundColor(.white)
-                    .cornerRadius(10)
-                
-                if !mappingManager.currentPositionText.isEmpty {
-                    Text(mappingManager.currentPositionText)
-                        .font(.body)
-                        .fontWeight(.medium)
-                        .multilineTextAlignment(.center)
-                        .padding()
-                        .background(Color.black.opacity(0.7))
-                        .foregroundColor(.cyan)
-                        .cornerRadius(10)
+            VStack {
+                // Top HUD
+                VStack(spacing: 8) {
+                    Text(statusText)
+                        .font(.headline)
+                        .foregroundColor(mappingManager.isLocalized ? .green : .white)
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 16)
+                        .background(Color.black.opacity(0.8))
+                        .cornerRadius(20)
+                    
+                    if !mappingManager.currentPositionText.isEmpty {
+                        Text(mappingManager.currentPositionText)
+                            .font(.system(.subheadline, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .multilineTextAlignment(.center)
+                            .padding(12)
+                            .background(Color.black.opacity(0.8))
+                            .foregroundColor(.cyan)
+                            .cornerRadius(12)
+                    }
+                    
+                    if let savedURL = mappingManager.savedMapURL {
+                        Text("Saved: \(savedURL.lastPathComponent)")
+                            .font(.caption2)
+                            .foregroundColor(.gray)
+                            .padding(.top, 4)
+                    }
                 }
+                .padding(.top, 50)
                 
-                if let savedURL = mappingManager.savedMapURL {
-                    Text("Saved to: \(savedURL.lastPathComponent)")
-                        .font(.caption)
-                        .foregroundColor(.green)
-                        .padding()
-                        .background(Color.black.opacity(0.7))
-                        .cornerRadius(10)
-                }
+                Spacer()
                 
-                HStack(spacing: 20) {
+                // Bottom Controls
+                VStack(spacing: 16) {
                     if !mappingManager.isMapping && !mappingManager.isRelocalizing {
-                        VStack(spacing: 15) {
-                            Button(action: {
-                                mappingManager.startMapping()
-                            }) {
-                                Text("Start Mapping")
-                                    .bold()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
+                        Button(action: { mappingManager.startMapping() }) {
+                            Text("Start New Mapping")
+                                .bold().frame(maxWidth: .infinity).padding()
+                                .background(Color.blue).foregroundColor(.white).cornerRadius(14)
+                        }
+                        Button(action: { mappingManager.loadMapAndRelocalize() }) {
+                            Text("Load Map & Relocalize")
+                                .bold().frame(maxWidth: .infinity).padding()
+                                .background(Color.orange).foregroundColor(.white).cornerRadius(14)
+                        }
+                    } else {
+                        // Drop POI Bar
+                        if mappingManager.isLocalized || mappingManager.isMapping {
+                            if !mappingManager.anchorsList.isEmpty {
+                                Text("Stored POIs: \(mappingManager.anchorsList.joined(separator: ", "))")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .lineLimit(1)
+                                    .padding(.horizontal)
                             }
                             
-                            Button(action: {
-                                mappingManager.loadMapAndRelocalize()
-                            }) {
-                                Text("Load Map & Relocalize")
-                                    .bold()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.orange)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
-                            }
-                        }
-                    } else if mappingManager.isMapping {
-                        if !mappingManager.anchorsList.isEmpty {
-                            Text("Anchors added: \(mappingManager.anchorsList.count)")
-                                .font(.caption)
-                                .foregroundColor(.white)
-                                .padding(.horizontal)
-                        }
-                        
-                        HStack {
-                            TextField("POI Name (e.g. Entrance)", text: $newPOIName)
-                                .textFieldStyle(RoundedBorderTextFieldStyle())
-                                .foregroundColor(.black)
-                                .padding(.leading)
-                            
-                            Button(action: {
-                                if !newPOIName.isEmpty {
-                                    mappingManager.addPOIAnchor(name: newPOIName)
-                                    newPOIName = ""
+                            HStack {
+                                TextField("Enter POI Name", text: $newPOIName)
+                                    .padding(12)
+                                    .background(Color.white)
+                                    .cornerRadius(8)
+                                    .foregroundColor(.black)
+                                
+                                Button(action: {
+                                    if !newPOIName.isEmpty {
+                                        mappingManager.addPOIAnchor(name: newPOIName)
+                                        newPOIName = ""
+                                    }
+                                }) {
+                                    Text("Drop POI")
+                                        .bold().padding(12)
+                                        .background(Color.purple).foregroundColor(.white).cornerRadius(8)
                                 }
-                            }) {
-                                Text("Drop POI")
-                                    .bold()
-                                    .padding()
-                                    .background(Color.purple)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
                             }
-                            .padding(.trailing)
                         }
                         
-                        HStack(spacing: 20) {
-                            Button(action: {
-                                mappingManager.saveMap()
-                            }) {
-                                Text("Save Map")
-                                    .bold()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.green)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
+                        // Action Buttons
+                        HStack(spacing: 16) {
+                            Button(action: { mappingManager.saveMap() }) {
+                                Text(mappingManager.isRelocalizing ? "Save Expanded Map" : "Save Map")
+                                    .bold().frame(maxWidth: .infinity).padding()
+                                    .background(Color.green).foregroundColor(.white).cornerRadius(14)
                             }
                             
-                            Button(action: {
-                                mappingManager.stopMapping()
-                            }) {
+                            Button(action: { mappingManager.stopMapping() }) {
                                 Text("Stop")
-                                    .bold()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.red)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(12)
+                                    .bold().frame(maxWidth: .infinity).padding()
+                                    .background(Color.red).foregroundColor(.white).cornerRadius(14)
                             }
-                        }
-                        .padding(.horizontal)
-                    } else if mappingManager.isRelocalizing {
-                        Button(action: {
-                            mappingManager.stopMapping() // Stops the session
-                        }) {
-                            Text("Stop Relocalizing")
-                                .bold()
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.red)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
                         }
                     }
                 }
-                .padding(.bottom, 30)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 40)
+                .background(
+                    LinearGradient(gradient: Gradient(colors: [Color.clear, Color.black.opacity(0.9)]), startPoint: .top, endPoint: .bottom)
+                        .edgesIgnoringSafeArea(.bottom)
+                )
             }
         }
     }

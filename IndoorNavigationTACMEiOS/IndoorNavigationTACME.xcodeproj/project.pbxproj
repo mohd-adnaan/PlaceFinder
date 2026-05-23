@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5D55F9582FBB7D3C00AAF844 /* ARMappingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D55F9572FBB7D3C00AAF844 /* ARMappingManager.swift */; };
+		5DF0CB5B2FBB7C98007C8AC4 /* ARMappingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF0CB5A2FBB7C98007C8AC4 /* ARMappingView.swift */; };
 		5F3B32A52F5F8228000AADBE /* NavigationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3B32A42F5F8224000AADBE /* NavigationSettingsView.swift */; };
 		5F3F2D7D2F678F3C008261F0 /* DebugLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3F2D7C2F678F38008261F0 /* DebugLogger.swift */; };
 		5F3F2D7F2F678F65008261F0 /* DataExportManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3F2D7E2F678F63008261F0 /* DataExportManager.swift */; };
@@ -15,11 +17,8 @@
 		5F4F75B12F3D18B3002B79DF /* NavigationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F4F75B02F3D18B3002B79DF /* NavigationManager.swift */; };
 		5FB48BF22F4D446700D733AB /* OpenAIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB48BF12F4D445B00D733AB /* OpenAIService.swift */; };
 		5FB48BF42F4D449500D733AB /* ConversationOrbView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB48BF32F4D449200D733AB /* ConversationOrbView.swift */; };
-		5FCE666B2F7D8ABD00CBEB98 /* Config.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 5FCE666A2F7D8AB700CBEB98 /* Config.xcconfig */; };
-		5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = 5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */; };
 		5FE9BCD02F5D38B2009F4503 /* Landingpageview.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */; };
 		5FE9BCD42F5D38FF009F4503 /* Voicenavigationmanager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */; };
-		A10000010000000000000023 /* LogWebAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000023 /* LogWebAppService.swift */; };
 		A10000010000000000000001 /* IndoorNavigationTACMEApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000001 /* IndoorNavigationTACMEApp.swift */; };
 		A10000010000000000000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000002 /* Models.swift */; };
 		A10000010000000000000003 /* NavigationAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000003 /* NavigationAPIService.swift */; };
@@ -40,14 +39,12 @@
 		A10000010000000000000019 /* QRDetectionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000019 /* QRDetectionCard.swift */; };
 		A10000010000000000000020 /* ConversationSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000020 /* ConversationSection.swift */; };
 		A10000010000000000000021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000021 /* Assets.xcassets */; };
-<<<<<<< Updated upstream
-=======
 		A10000010000000000000023 /* LogWebAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000023 /* LogWebAppService.swift */; };
-		AA97CF3A69674C7E6007DC3B /* ARLocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5602FD2D102E15813F66556 /* ARLocalizationManager.swift */; };
->>>>>>> Stashed changes
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		5D55F9572FBB7D3C00AAF844 /* ARMappingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMappingManager.swift; sourceTree = "<group>"; };
+		5DF0CB5A2FBB7C98007C8AC4 /* ARMappingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMappingView.swift; sourceTree = "<group>"; };
 		5F3B32A42F5F8224000AADBE /* NavigationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationSettingsView.swift; sourceTree = "<group>"; };
 		5F3F2D7C2F678F38008261F0 /* DebugLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugLogger.swift; sourceTree = "<group>"; };
 		5F3F2D7E2F678F63008261F0 /* DataExportManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataExportManager.swift; sourceTree = "<group>"; };
@@ -56,11 +53,8 @@
 		5F4F75B02F3D18B3002B79DF /* NavigationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationManager.swift; sourceTree = "<group>"; };
 		5FB48BF12F4D445B00D733AB /* OpenAIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenAIService.swift; sourceTree = "<group>"; };
 		5FB48BF32F4D449200D733AB /* ConversationOrbView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationOrbView.swift; sourceTree = "<group>"; };
-		5FCE666A2F7D8AB700CBEB98 /* Config.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config.xcconfig; sourceTree = "<group>"; };
-		5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config_EXAPMLE.xcconfig; sourceTree = "<group>"; };
 		5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Landingpageview.swift; sourceTree = "<group>"; };
 		5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voicenavigationmanager.swift; sourceTree = "<group>"; };
-		A20000010000000000000023 /* LogWebAppService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogWebAppService.swift; sourceTree = "<group>"; };
 		A20000010000000000000001 /* IndoorNavigationTACMEApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IndoorNavigationTACMEApp.swift; sourceTree = "<group>"; };
 		A20000010000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A20000010000000000000003 /* NavigationAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationAPIService.swift; sourceTree = "<group>"; };
@@ -82,8 +76,8 @@
 		A20000010000000000000020 /* ConversationSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationSection.swift; sourceTree = "<group>"; };
 		A20000010000000000000021 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A20000010000000000000022 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A20000010000000000000023 /* LogWebAppService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogWebAppService.swift; sourceTree = "<group>"; };
 		A30000010000000000000001 /* IndoorNavigationTACME.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IndoorNavigationTACME.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		C5602FD2D102E15813F66556 /* ARLocalizationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ARLocalizationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -117,8 +111,6 @@
 				A50000010000000000000008 /* Views */,
 				A20000010000000000000021 /* Assets.xcassets */,
 				A20000010000000000000022 /* Info.plist */,
-				5FD26BB42F27145700273EC4 /* Config_EXAPMLE.xcconfig */,
-				5FCE666A2F7D8AB700CBEB98 /* Config.xcconfig */,
 			);
 			path = IndoorNavigationTACME;
 			sourceTree = "<group>";
@@ -153,6 +145,7 @@
 		A50000010000000000000006 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				5D55F9572FBB7D3C00AAF844 /* ARMappingManager.swift */,
 				5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */,
 				5F4F75B02F3D18B3002B79DF /* NavigationManager.swift */,
 				A20000010000000000000005 /* IMUSensorManager.swift */,
@@ -161,7 +154,6 @@
 				A20000010000000000000008 /* QRCodeDetector.swift */,
 				A20000010000000000000009 /* LanguageManager.swift */,
 				A20000010000000000000011 /* ConversationManager.swift */,
-				C5602FD2D102E15813F66556 /* ARLocalizationManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -179,6 +171,7 @@
 		A50000010000000000000008 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				5DF0CB5A2FBB7C98007C8AC4 /* ARMappingView.swift */,
 				5F3B32A42F5F8224000AADBE /* NavigationSettingsView.swift */,
 				5FE9BCCF2F5D38AF009F4503 /* Landingpageview.swift */,
 				5FB48BF32F4D449200D733AB /* ConversationOrbView.swift */,
@@ -262,10 +255,8 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5FCE666B2F7D8ABD00CBEB98 /* Config.xcconfig in Resources */,
 				5F4F75AF2F3D0F31002B79DF /* map_data.json in Resources */,
 				A10000010000000000000021 /* Assets.xcassets in Resources */,
-				5FD26BB52F27145D00273EC4 /* Config_EXAPMLE.xcconfig in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -282,6 +273,7 @@
 				5F3F2D7D2F678F3C008261F0 /* DebugLogger.swift in Sources */,
 				A10000010000000000000003 /* NavigationAPIService.swift in Sources */,
 				A10000010000000000000023 /* LogWebAppService.swift in Sources */,
+				5D55F9582FBB7D3C00AAF844 /* ARMappingManager.swift in Sources */,
 				A10000010000000000000004 /* GeminiService.swift in Sources */,
 				A10000010000000000000005 /* IMUSensorManager.swift in Sources */,
 				A10000010000000000000006 /* IMUCalibrationManager.swift in Sources */,
@@ -300,12 +292,12 @@
 				5FE9BCD42F5D38FF009F4503 /* Voicenavigationmanager.swift in Sources */,
 				A10000010000000000000016 /* StepCalibrationCard.swift in Sources */,
 				5F3F2D7F2F678F65008261F0 /* DataExportManager.swift in Sources */,
+				5DF0CB5B2FBB7C98007C8AC4 /* ARMappingView.swift in Sources */,
 				A10000010000000000000017 /* InstructionCard.swift in Sources */,
 				A10000010000000000000018 /* NavigationControlsView.swift in Sources */,
 				A10000010000000000000019 /* QRDetectionCard.swift in Sources */,
 				A10000010000000000000020 /* ConversationSection.swift in Sources */,
 				5FB48BF42F4D449500D733AB /* ConversationOrbView.swift in Sources */,
-				AA97CF3A69674C7E6007DC3B /* ARLocalizationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -438,7 +430,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = VL65RWJV78;
+				DEVELOPMENT_TEAM = VZQ42C6YHM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IndoorNavigationTACME/Info.plist;
@@ -471,7 +463,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = VL65RWJV78;
+				DEVELOPMENT_TEAM = VZQ42C6YHM;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IndoorNavigationTACME/Info.plist;

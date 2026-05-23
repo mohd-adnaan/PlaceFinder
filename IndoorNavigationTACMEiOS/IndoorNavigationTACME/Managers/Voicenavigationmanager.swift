@@ -25,7 +25,6 @@ class VoiceNavigationManager: ObservableObject {
         case listeningDestination
         case confirmingDestination
         case confirmingBoth
-        case relocalizing
     }
 
     struct VoiceInputState {
@@ -77,7 +76,6 @@ class VoiceNavigationManager: ObservableObject {
 
     private var ttsManager: TTSManager?
     private var languageManager: LanguageManager?
-    private var arLocalizationManager: ARLocalizationManager?
     private var ttsStateSubscription: AnyCancellable?
 
     private var tempSource: String = ""
@@ -114,7 +112,6 @@ class VoiceNavigationManager: ObservableObject {
     func configure(ttsManager: TTSManager, languageManager: LanguageManager) {
         self.ttsManager = ttsManager
         self.languageManager = languageManager
-        self.arLocalizationManager = ARLocalizationManager()
         setupSpeechRecognizer()
         observeTTSState(ttsManager)
         print("VoiceNavigationManager: Dependencies configured")
@@ -430,30 +427,6 @@ class VoiceNavigationManager: ObservableObject {
         case .listeningSource:
             let extracted = extractLocation(text, expectedType: "source")
             if !extracted.isEmpty {
-                if extracted.lowercased() == "where am i" {
-                    voiceInputState.currentMode = .relocalizing
-                    let isFrench = languageManager?.currentLanguage == .french
-                    let msg = isFrench ? "Localisation en cours. Pointez votre caméra autour de vous." : "Locating you. Please look around with your camera."
-                    voiceInputState.debugInfo = "Locating user with AR..."
-                    ttsManager?.speak(msg, force: true)
-
-                    arLocalizationManager?.startLocalization { [weak self] foundPOI in
-                        guard let self = self else { return }
-                        DispatchQueue.main.async {
-                            let localizedPOI = foundPOI.isEmpty ? (isFrench ? "Inconnu" : "Unknown") : foundPOI
-                            let foundMsg = isFrench ? "Vous êtes à \(self.speechFriendlyLocation(localizedPOI))." : "You are at \(self.speechFriendlyLocation(localizedPOI))."
-                            self.ttsManager?.speak(foundMsg, force: true)
-                            self.tempSource = localizedPOI
-
-                            // Immediately prompt for destination after finding source
-                            let destPrompt = isFrench ? "Où voulez-vous aller ?" : "Where do you want to go?"
-                            self.voiceInputState.currentMode = .listeningDestination
-                            self.speakThenListen(destPrompt, delay: 0.5)
-                        }
-                    }
-                    return
-                }
-
                 tempSource = extracted
                 let spokenSource = speechFriendlyLocation(extracted)
                 let isFrench = languageManager?.currentLanguage == .french
@@ -706,12 +679,6 @@ class VoiceNavigationManager: ObservableObject {
     private func extractLocation(_ text: String, expectedType: String) -> String {
         let cleanText = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
         print("VoiceNavigationManager: Extracting \(expectedType) from '\(cleanText)'")
-
-        // Check for specific phrases asking for current location
-        if expectedType == "source" &&
-            (cleanText.contains("where am i") || cleanText.contains("current location") || cleanText.contains("my location") || cleanText.contains("find me") || cleanText.contains("où suis-je") || cleanText.contains("où suis je")) {
-            return "where am i"
-        }
 
         // Pattern: "source room 435"
         let p1 = "\(expectedType)\\s+(room\\s*\\d+)"

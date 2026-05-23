@@ -110,26 +110,48 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
             self.mappingStatus = frame.worldMappingStatus
             
             if self.isLocalized {
-                let transform = frame.camera.transform
-                let x = transform.columns.3.x
-                let z = transform.columns.3.z
+                let cameraTransform = frame.camera.transform
+                let x = cameraTransform.columns.3.x
+                let z = cameraTransform.columns.3.z
                 let yaw = frame.camera.eulerAngles.y * 180 / .pi
                 
-                // Find closest POI directly from our permanent map database
-                let cameraPos = simd_make_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
-                var minDistance: Float = Float.infinity
-                var nearestName: String? = nil
+                let cameraPos = simd_make_float3(cameraTransform.columns.3.x, cameraTransform.columns.3.y, cameraTransform.columns.3.z)
+                // ARKit camera looks down the negative Z axis
+                let cameraForward = simd_normalize(simd_make_float3(-cameraTransform.columns.2.x, -cameraTransform.columns.2.y, -cameraTransform.columns.2.z))
+
+                var bestScore: Float = Float.infinity
+                var exactName: String? = nil
                 
                 for (name, pos) in self.mapPOIs {
-                    let distance = simd_distance(cameraPos, pos)
-                    if distance < minDistance {
-                        minDistance = distance
-                        nearestName = name
+                    let toPOI = pos - cameraPos
+                    let distance = simd_length(toPOI)
+
+                    if distance < 0.1 { // If we are essentially inside the POI
+                        if distance < bestScore {
+                            bestScore = distance
+                            exactName = name
+                        }
+                        continue
+                    }
+
+                    let dirToPOI = toPOI / distance
+                    let dotProduct = simd_dot(cameraForward, dirToPOI)
+
+                    // User is looking in the direction of the POI
+                    if dotProduct > 0.8 {
+                        // The user has this POI in their view cone.
+                        // We score it primarily by distance, so the nearest one they look at wins.
+                        let score = distance
+
+                        if score < bestScore {
+                            bestScore = score
+                            exactName = name
+                        }
                     }
                 }
                 
-                self.closestPOI = nearestName
-                let poiText = nearestName != nil ? "\n📍 Nearest: \(nearestName!) (\(String(format: "%.1f", minDistance))m)" : ""
+                self.closestPOI = exactName
+                let poiText = exactName != nil ? "\n📍 POI: \(exactName!)" : ""
                 self.currentPositionText = String(format: "X: %.1f, Z: %.1f | HDG: %.0f°%@", x, z, yaw, poiText)
             } else {
                 self.currentPositionText = ""

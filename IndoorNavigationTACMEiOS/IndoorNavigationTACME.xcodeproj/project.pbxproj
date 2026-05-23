@@ -40,6 +40,7 @@
 		A10000010000000000000020 /* ConversationSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000020 /* ConversationSection.swift */; };
 		A10000010000000000000021 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000021 /* Assets.xcassets */; };
 		A10000010000000000000023 /* LogWebAppService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000010000000000000023 /* LogWebAppService.swift */; };
+		AA97CF3A69674C7E6007DC3B /* ARLocalizationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5602FD2D102E15813F66556 /* ARLocalizationManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -78,6 +79,7 @@
 		A20000010000000000000022 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A20000010000000000000023 /* LogWebAppService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogWebAppService.swift; sourceTree = "<group>"; };
 		A30000010000000000000001 /* IndoorNavigationTACME.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IndoorNavigationTACME.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		C5602FD2D102E15813F66556 /* ARLocalizationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ARLocalizationManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -154,6 +156,7 @@
 				A20000010000000000000008 /* QRCodeDetector.swift */,
 				A20000010000000000000009 /* LanguageManager.swift */,
 				A20000010000000000000011 /* ConversationManager.swift */,
+				C5602FD2D102E15813F66556 /* ARLocalizationManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -298,6 +301,7 @@
 				A10000010000000000000019 /* QRDetectionCard.swift in Sources */,
 				A10000010000000000000020 /* ConversationSection.swift in Sources */,
 				5FB48BF42F4D449500D733AB /* ConversationOrbView.swift in Sources */,
+				AA97CF3A69674C7E6007DC3B /* ARLocalizationManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -24,6 +24,16 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         config.planeDetection = [.horizontal, .vertical]
         config.environmentTexturing = .automatic
         config.worldAlignment = .gravityAndHeading
+
+        // Ensure 3D depth and geometry mapping without LiDAR is as robust as possible.
+        // If LiDAR is available, it uses sceneReconstruction, but for non-Pro iPhones
+        // it relies heavily on feature points and plane detection which we enabled above.
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            config.sceneReconstruction = .mesh
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+            config.sceneReconstruction = .meshWithClassification
+        }
+
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
         isMapping = true
         isRelocalizing = false
@@ -82,6 +92,12 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         config.planeDetection = [.horizontal, .vertical]
         config.worldAlignment = .gravityAndHeading
         
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            config.sceneReconstruction = .mesh
+        } else if ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshWithClassification) {
+            config.sceneReconstruction = .meshWithClassification
+        }
+
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
         isRelocalizing = true
         isMapping = false

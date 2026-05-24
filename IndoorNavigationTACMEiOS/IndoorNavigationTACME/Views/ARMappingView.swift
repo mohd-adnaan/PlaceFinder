@@ -11,21 +11,6 @@ struct ARViewContainer: UIViewRepresentable {
         // Show feature points so the developer knows what ARKit sees
         arView.debugOptions = [.showFeaturePoints]
         arView.autoenablesDefaultLighting = true
-
-        let coachingOverlay = ARCoachingOverlayView()
-        coachingOverlay.session = arView.session
-        coachingOverlay.goal = .tracking
-        coachingOverlay.activatesAutomatically = true
-        coachingOverlay.translatesAutoresizingMaskIntoConstraints = false
-
-        arView.addSubview(coachingOverlay)
-        NSLayoutConstraint.activate([
-            coachingOverlay.centerXAnchor.constraint(equalTo: arView.centerXAnchor),
-            coachingOverlay.centerYAnchor.constraint(equalTo: arView.centerYAnchor),
-            coachingOverlay.widthAnchor.constraint(equalTo: arView.widthAnchor),
-            coachingOverlay.heightAnchor.constraint(equalTo: arView.heightAnchor)
-        ])
-
         return arView
     }
 

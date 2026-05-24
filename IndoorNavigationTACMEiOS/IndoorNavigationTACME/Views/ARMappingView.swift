@@ -11,6 +11,13 @@ struct ARViewContainer: UIViewRepresentable {
         // Show feature points so the developer knows what ARKit sees
         arView.debugOptions = [.showFeaturePoints]
         arView.autoenablesDefaultLighting = true
+        
+        let coachingOverlay = ARCoachingOverlayView()
+        coachingOverlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        coachingOverlay.session = session
+        coachingOverlay.goal = .tracking
+        arView.addSubview(coachingOverlay)
+        
         return arView
     }
 
@@ -25,6 +32,12 @@ struct ARMappingView: View {
         ZStack(alignment: .bottom) {
             ARViewContainer(session: mappingManager.session)
                 .edgesIgnoringSafeArea(.all)
+                .onAppear {
+                    mappingManager.startCameraFeed()
+                }
+                .onDisappear {
+                    mappingManager.stopMapping()
+                }
 
             VStack {
                 // Top HUD

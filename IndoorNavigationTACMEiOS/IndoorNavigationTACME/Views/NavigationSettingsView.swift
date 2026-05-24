@@ -18,7 +18,6 @@ struct NavigationSettingsView: View {
     @EnvironmentObject var qrDetector: QRCodeDetector
     @EnvironmentObject var conversationManager: ConversationManager
     @EnvironmentObject var languageManager: LanguageManager
-    @EnvironmentObject var arMappingManager: ARMappingManager
 
     @Environment(\.dismiss) var dismiss
 

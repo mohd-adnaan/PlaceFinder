@@ -19,6 +19,13 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         session.delegate = self
     }
     
+    func startCameraFeed() {
+        let config = ARWorldTrackingConfiguration()
+        // Just start the camera so it's not a black screen. 
+        // The coaching overlay will take over.
+        session.run(config)
+    }
+    
     func startMapping() {
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal, .vertical]
@@ -41,50 +48,61 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
                 return
             }
             
-            do {
-                let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
-                let url = self.getDocumentsDirectory().appendingPathComponent("BuildingMap.arexperience")
-                try data.write(to: url)
-                
-                DispatchQueue.main.async {
-                    self.savedMapURL = url
-                    print("✅ Map successfully saved to: \(url.path)")
+            // Move heavy archiving and file I/O to a background thread to prevent main thread freezing!
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let data = try NSKeyedArchiver.archivedData(withRootObject: map, requiringSecureCoding: true)
+                    let url = self.getDocumentsDirectory().appendingPathComponent("BuildingMap.arexperience")
+                    try data.write(to: url)
+                    
+                    DispatchQueue.main.async {
+                        self.savedMapURL = url
+                        print("✅ Map successfully saved to: \(url.path)")
+                    }
+                } catch {
+                    print("❌ Failed to save map: \(error)")
                 }
-            } catch {
-                print("❌ Failed to save map: \(error)")
             }
         }
     }
     
     func loadMapAndRelocalize() {
         let url = getDocumentsDirectory().appendingPathComponent("BuildingMap.arexperience")
-        guard let data = try? Data(contentsOf: url),
-              let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) else {
-            print("❌ No map found at \(url.path)")
-            return
-        }
         
-        DispatchQueue.main.async {
-            self.anchorsList = map.anchors.compactMap { $0.name }
-            self.mapPOIs.removeAll()
-            for anchor in map.anchors {
-                if let name = anchor.name {
-                    self.mapPOIs[name] = simd_make_float3(anchor.transform.columns.3.x, anchor.transform.columns.3.y, anchor.transform.columns.3.z)
-                }
+        DispatchQueue.global(qos: .userInitiated).async {
+            guard let data = try? Data(contentsOf: url),
+                  let map = try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data) else {
+                print("❌ No map found at \(url.path)")
+                return
             }
-            self.isRelocalizing = true
-            self.isMapping = false
-            self.isLocalized = false
+            
+            DispatchQueue.main.async {
+                self.anchorsList.removeAll()
+                self.mapPOIs.removeAll()
+                print("🗺️ Loading POIs from ARWorldMap...")
+                for anchor in map.anchors {
+                    // Ignore ARPlaneAnchor and other subclasses; only load our manually dropped ARAnchors
+                    if type(of: anchor) == ARAnchor.self, let name = anchor.name {
+                        self.anchorsList.append(name)
+                        let pos = simd_make_float3(anchor.transform.columns.3.x, anchor.transform.columns.3.y, anchor.transform.columns.3.z)
+                        self.mapPOIs[name] = pos
+                        print("   📍 Loaded POI: '\(name)' at X: \(String(format: "%.2f", pos.x)), Y: \(String(format: "%.2f", pos.y)), Z: \(String(format: "%.2f", pos.z))")
+                    }
+                }
+                print("🗺️ Total POIs loaded: \(self.mapPOIs.count)")
+                
+                self.isRelocalizing = true
+                self.isMapping = false
+                self.isLocalized = false
+                
+                let config = ARWorldTrackingConfiguration()
+                config.initialWorldMap = map
+                config.planeDetection = [.horizontal, .vertical]
+                config.worldAlignment = .gravityAndHeading
+                
+                self.session.run(config, options: [.resetTracking, .removeExistingAnchors])
+            }
         }
-
-        let config = ARWorldTrackingConfiguration()
-        config.initialWorldMap = map
-        config.planeDetection = [.horizontal, .vertical]
-        config.worldAlignment = .gravityAndHeading
-        
-        session.run(config, options: [.resetTracking, .removeExistingAnchors])
-        isRelocalizing = true
-        isMapping = false
     }
     
     func addPOIAnchor(name: String) {
@@ -104,19 +122,30 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         print("✅ Added POI Anchor: \(name)")
     }
 
+    private var lastUpdateTime: TimeInterval = 0
+
     // MARK: - ARSessionDelegate
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
+        // Throttle to 10 FPS to completely eliminate main thread flooding and lag!
+        let currentTime = frame.timestamp
+        if currentTime - lastUpdateTime < 0.1 { return }
+        lastUpdateTime = currentTime
+        
+        // Extract values OUTSIDE the main thread block
+        let mappingStatus = frame.worldMappingStatus
+        let transform = frame.camera.transform
+        let yaw = frame.camera.eulerAngles.y * 180 / .pi
+        
+        let x = transform.columns.3.x
+        let y = transform.columns.3.y
+        let z = transform.columns.3.z
+        let cameraPos = simd_make_float3(x, y, z)
+
         DispatchQueue.main.async {
-            self.mappingStatus = frame.worldMappingStatus
+            self.mappingStatus = mappingStatus
             
             if self.isLocalized {
-                let transform = frame.camera.transform
-                let x = transform.columns.3.x
-                let z = transform.columns.3.z
-                let yaw = frame.camera.eulerAngles.y * 180 / .pi
-                
                 // Find closest POI directly from our permanent map database
-                let cameraPos = simd_make_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
                 var minDistance: Float = Float.infinity
                 var nearestName: String? = nil
 

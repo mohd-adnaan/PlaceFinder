@@ -47,16 +47,13 @@ actor NavigationAPIService {
         var payloadA: [String: Any] = [
             "action": "conversation",
             "conversationMode": true,
+            "source": source ?? "",
+            "destination": destination ?? "",
             "conversationData": [
                 "query": userText
             ]
         ]
-        if let source, !source.isEmpty {
-            payloadA["source"] = source
-        }
-        if let destination, !destination.isEmpty {
-            payloadA["destination"] = destination
-        }
+        
         if let routeData, !routeData.isEmpty {
             payloadA["conversationData"] = [
                 "query": userText,

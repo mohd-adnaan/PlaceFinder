@@ -36,7 +36,7 @@ We will introduce three new components to the iOS app, ensuring we do not break 
 To make ARKit work with your existing `NavigationManager` and `IMUSensorManager`, we need to align the data.
 
 ### Coordinate Transformation
-ARKit uses meters, but its `[0,0]` origin is arbitrary (wherever the map was originally started). 
+ARKit uses meters, but its `[0,0]` origin is arbitrary (wherever the map was originally started).
 - We will define a **Map Offset Variable** in `Config.xcconfig` or `Models.swift`.
 - Example: If the physical front door is `ARKit [0,0]` but your GeoJSON backend expects the front door to be `GeoJSON [15.5, 20.0]`, we apply an offset: `realX = arkitX + 15.5`.
 
@@ -67,4 +67,3 @@ ARKit uses meters, but its `[0,0]` origin is arbitrary (wherever the map was ori
 1. Write the math function to convert ARKit `(X, Z)` to GeoJSON `(X, Y)`.
 2. Update the main App Startup UI: Remove the "Select Source" dropdown. Replace it with an automatic loader that says *"Locating you..."* and uses TTS to announce when the location is found.
 3. **Action:** Test the full flow. Open app -> ARKit finds position -> Handoff to IMU -> Navigation starts.
-

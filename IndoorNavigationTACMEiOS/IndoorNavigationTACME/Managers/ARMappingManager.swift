@@ -76,7 +76,7 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
             self.isMapping = false
             self.isLocalized = false
         }
-        
+
         let config = ARWorldTrackingConfiguration()
         config.initialWorldMap = map
         config.planeDetection = [.horizontal, .vertical]
@@ -92,9 +92,9 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         // Create an anchor at the current camera position
         let anchor = ARAnchor(name: name, transform: currentTransform)
         session.add(anchor: anchor)
-        
+
         let anchorPos = simd_make_float3(currentTransform.columns.3.x, currentTransform.columns.3.y, currentTransform.columns.3.z)
-        
+
         DispatchQueue.main.async {
             if !self.anchorsList.contains(name) {
                 self.anchorsList.append(name)
@@ -103,7 +103,7 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
         }
         print("✅ Added POI Anchor: \(name)")
     }
-    
+
     // MARK: - ARSessionDelegate
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         DispatchQueue.main.async {
@@ -119,7 +119,7 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
                 let cameraPos = simd_make_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
                 var minDistance: Float = Float.infinity
                 var nearestName: String? = nil
-                
+
                 for (name, pos) in self.mapPOIs {
                     let distance = simd_distance(cameraPos, pos)
                     if distance < minDistance {
@@ -127,7 +127,7 @@ class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate {
                         nearestName = name
                     }
                 }
-                
+
                 self.closestPOI = nearestName
                 let poiText = nearestName != nil ? "\n📍 Nearest: \(nearestName!) (\(String(format: "%.1f", minDistance))m)" : ""
                 self.currentPositionText = String(format: "X: %.1f, Z: %.1f | HDG: %.0f°%@", x, z, yaw, poiText)

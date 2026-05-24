@@ -343,7 +343,7 @@ struct NavigationSettingsView: View {
             .padding()
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
-            
+
             // AR Localization & Mapping Button
             NavigationLink(destination: ARMappingView()) {
                 HStack {

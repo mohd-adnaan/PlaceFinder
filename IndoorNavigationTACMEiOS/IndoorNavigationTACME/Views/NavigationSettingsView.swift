@@ -18,6 +18,7 @@ struct NavigationSettingsView: View {
     @EnvironmentObject var qrDetector: QRCodeDetector
     @EnvironmentObject var conversationManager: ConversationManager
     @EnvironmentObject var languageManager: LanguageManager
+    @EnvironmentObject var arMappingManager: ARMappingManager
 
     @Environment(\.dismiss) var dismiss
 
@@ -342,6 +343,28 @@ struct NavigationSettingsView: View {
             .padding()
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
+
+            // AR Localization & Mapping Button
+            NavigationLink(destination: ARMappingView()) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Label("AR Localization & Mapping", systemImage: "arkit")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.blue)
+
+                        Text("Scan the environment to build or load a localization map")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundColor(.gray)
+                }
+                .padding()
+                .background(Color(.secondarySystemBackground))
+                .cornerRadius(12)
+            }
         }
     }
 

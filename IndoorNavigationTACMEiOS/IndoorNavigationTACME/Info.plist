@@ -71,6 +71,6 @@
 	<key>OPENAI_API_KEY</key>
 	<string>$(OPENAI_API_KEY)</string>
 	<key>LOG_WEB_APP_URL</key>
-	<string>$(LOG_WEB_APP_URL)</string>
+	<string>https://script.google.com/macros/s/AKfycbyG6E81kJd9uxkNmfPrOx3OnfhEfuo5OUBXOI8NiU_puDZgWJoOhhkbVqPu_VbvkAWd/exec</string>
 </dict>
 </plist>

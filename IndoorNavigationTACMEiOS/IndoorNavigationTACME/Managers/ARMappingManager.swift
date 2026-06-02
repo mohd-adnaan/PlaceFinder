@@ -27,15 +27,24 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     @Published var poiMatchStatusText: String?
     @Published var anchorsList: [String] = []
     @Published var mapPOIs: [String: simd_float3] = [:]
+    @Published var mapFeaturePoints: [simd_float3] = []
+    @Published var mapFeaturePointCount: Int = 0
+    @Published var cameraMapPosition: simd_float3?
+    @Published var cameraMapForward: simd_float3?
+    @Published var arHeadingDegrees: Double?
+    @Published var poiInspectionList: [ARMapPOIInspection] = []
     
     let session = ARSession()
     private let sessionDelegateQueue = DispatchQueue(label: "placefinder.arkit.mapping.session", qos: .userInitiated)
     private let poiRecordsQueue = DispatchQueue(label: "placefinder.arkit.mapping.poi-records", attributes: .concurrent)
+    private let imuMotionQueue = DispatchQueue(label: "placefinder.arkit.mapping.imu-motion", attributes: .concurrent)
     private let mapStore = ARMapStore()
     private let frameFingerprinter = ARFrameFingerprinter()
     private var poiAnchorsByName: [String: ARAnchor] = [:]
     private var poiRecords: [POIRecord] = []
     private var activeMapMetadata: ARStoredMapMetadata?
+    private var latestIMUMotion: ARIMUMotionState?
+    private var motionReference: ARIMUMotionReference?
     private var lastUpdateTime: TimeInterval = 0
     private var lastVisualMatchTime: TimeInterval = 0
     private var lastVisualMatchResult: VisualPOIMatchResult?
@@ -48,18 +57,21 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     private let maxPOIRecognitionDistance: Float = 24.0
     private let verticalTolerance: Float = 2.0
     private let minimumPOIMatchConfidence: Float = 0.58
-    private let ambiguousScoreGap: Float = 0.16
-    private let spatialAmbiguityConfidencePenalty: Float = 0.20
+    private let ambiguousScoreGap: Float = 0.20
     private let visualAgreementConfidence: Float = 0.72
-    private let visualAmbiguousConfidenceGap: Float = 0.12
-    private let visualAmbiguityConfidencePenalty: Float = 0.14
-    private let visualPoseRequiredConfidence: Float = 0.84
-    private let visualPoseConfirmationDistance: Float = 2.2
-    private let visualOverrideConfidence: Float = 0.88
-    private let visualDisagreementMaxDistance: Float = 4.0
-    private let stableMatchRequiredFrames = 3
-    private let stableMatchRequiredDuration: TimeInterval = 0.85
-    private let stableMatchMinimumConfidence: Float = 0.78
+    private let visualAmbiguousConfidenceGap: Float = 0.20
+    private let visualPoseRequiredConfidence: Float = 0.88
+    private let visualPoseConfirmationDistance: Float = 1.35
+    private let visualOverrideConfidence: Float = 0.94
+    private let visualDisagreementMaxDistance: Float = 1.6
+    private let stableMatchRequiredFrames = 5
+    private let stableMatchRequiredDuration: TimeInterval = 1.2
+    private let stableMatchMinimumConfidence: Float = 0.82
+    private let maxInspectableFeaturePoints = 1800
+    private let imuMotionMinimumSteps = 2
+    private let imuMotionMinimumDistance: Float = 0.8
+    private let imuMotionDirectionMinimumDistance: Float = 1.15
+    private let imuMotionDirectionToleranceDegrees: Double = 48
     
     override init() {
         super.init()
@@ -72,6 +84,20 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         // Kept for compatibility with older call sites. The AR session is intentionally idle
         // until the user explicitly starts mapping or relocalization.
         stopMapping()
+    }
+
+    func updateIMUMotion(_ imuState: IMUState) {
+        let motion = ARIMUMotionState(
+            position: SIMD2<Double>(imuState.position.x, imuState.position.y),
+            bearing: imuState.position.bearing,
+            stepCount: imuState.stepCount,
+            isMoving: imuState.isMoving,
+            updatedAt: Date()
+        )
+
+        imuMotionQueue.async(flags: .barrier) {
+            self.latestIMUMotion = motion
+        }
     }
     
     func startMapping() {
@@ -95,11 +121,18 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         poiMatchStatusText = nil
         anchorsList.removeAll()
         mapPOIs.removeAll()
+        mapFeaturePoints.removeAll()
+        mapFeaturePointCount = 0
+        cameraMapPosition = nil
+        cameraMapForward = nil
+        arHeadingDegrees = nil
+        poiInspectionList.removeAll()
         poiAnchorsByName.removeAll()
         replacePOIRecords(with: [])
         lastVisualMatchTime = 0
         lastVisualMatchResult = nil
         resetStableMatch()
+        resetMotionReference()
         statusMessage = nil
     }
     
@@ -114,9 +147,13 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         currentPositionText = ""
         closestPOI = nil
         poiMatchStatusText = nil
+        cameraMapPosition = nil
+        cameraMapForward = nil
+        arHeadingDegrees = nil
         lastVisualMatchTime = 0
         lastVisualMatchResult = nil
         resetStableMatch()
+        resetMotionReference()
     }
     
     func saveMap(named requestedName: String? = nil) {
@@ -137,13 +174,15 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let loadedPOIs = self.deduplicatedPOIs(self.extractPOIs(from: map))
+                    let featureSnapshot = self.sampledFeaturePoints(from: map.rawFeaturePoints)
                     let recordsByName = Dictionary(uniqueKeysWithValues: recordsSnapshot.map { ($0.name, $0) })
                     let storedPOIs = loadedPOIs.map { poi in
                         ARStoredPOI(
                             name: poi.name,
                             position: ARCodableVector3(poi.position),
                             visualFingerprint: recordsByName[poi.name]?.visualFingerprints.first,
-                            visualFingerprints: recordsByName[poi.name]?.visualFingerprints
+                            visualFingerprints: recordsByName[poi.name]?.visualFingerprints,
+                            motionFingerprint: recordsByName[poi.name]?.motionFingerprint
                         )
                     }
                     let metadata = try self.mapStore.save(
@@ -159,6 +198,9 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                         self.activeMapMetadata = metadata
                         self.activeMapName = metadata.name
                         self.selectedMapID = metadata.id
+                        self.mapFeaturePoints = featureSnapshot.points
+                        self.mapFeaturePointCount = featureSnapshot.totalCount
+                        self.refreshPOIInspectionList()
                         self.refreshSavedMaps()
                         self.statusMessage = "Saved \(metadata.name) with \(metadata.pois.count) POIs."
                     }
@@ -193,11 +235,13 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 let metadata = loadedMap.metadata
                 let metadataByName = Dictionary(uniqueKeysWithValues: metadata.pois.map { ($0.name, $0) })
                 let loadedPOIs = self.deduplicatedPOIs(self.extractPOIs(from: map))
+                let featureSnapshot = self.sampledFeaturePoints(from: map.rawFeaturePoints)
                 let records = loadedPOIs.map { poi in
                     POIRecord(
                         name: poi.name,
                         position: poi.position,
-                        visualFingerprints: metadataByName[poi.name]?.allVisualFingerprints ?? []
+                        visualFingerprints: metadataByName[poi.name]?.allVisualFingerprints ?? [],
+                        motionFingerprint: metadataByName[poi.name]?.motionFingerprint
                     )
                 }
 
@@ -206,6 +250,9 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                     self.mapPOIs = Dictionary(uniqueKeysWithValues: loadedPOIs.map { ($0.name, $0.position) })
                     self.poiAnchorsByName = Dictionary(uniqueKeysWithValues: loadedPOIs.map { ($0.name, $0.anchor) })
                     self.replacePOIRecords(with: records)
+                    self.mapFeaturePoints = featureSnapshot.points
+                    self.mapFeaturePointCount = featureSnapshot.totalCount
+                    self.refreshPOIInspectionList()
                     self.activeMapMetadata = metadata
                     self.activeMapName = metadata.name
                     self.selectedMapID = metadata.id
@@ -221,6 +268,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                     self.lastVisualMatchTime = 0
                     self.lastVisualMatchResult = nil
                     self.resetStableMatch()
+                    self.resetMotionReference()
                     self.statusMessage = loadedPOIs.isEmpty
                         ? "Map loaded. No POIs are pinned yet."
                         : "Map loaded with \(loadedPOIs.count) POIs."
@@ -250,6 +298,16 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             if activeMapMetadata?.id == id {
                 activeMapMetadata = nil
                 activeMapName = nil
+                anchorsList.removeAll()
+                mapPOIs.removeAll()
+                mapFeaturePoints.removeAll()
+                mapFeaturePointCount = 0
+                cameraMapPosition = nil
+                cameraMapForward = nil
+                arHeadingDegrees = nil
+                poiAnchorsByName.removeAll()
+                replacePOIRecords(with: [])
+                poiInspectionList.removeAll()
             }
             if selectedMapID == id {
                 selectedMapID = nil
@@ -296,7 +354,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         }
         mapPOIs[trimmedName] = anchorPos
         poiAnchorsByName[trimmedName] = anchor
-        upsertPOIRecord(name: trimmedName, position: anchorPos, visualFingerprint: visualFingerprint, preservesExistingSamples: true)
+        upsertPOIRecord(
+            name: trimmedName,
+            position: anchorPos,
+            visualFingerprint: visualFingerprint,
+            motionFingerprint: currentMotionFingerprint(),
+            preservesExistingSamples: true
+        )
+        refreshPOIInspectionList()
         statusMessage = visualFingerprint == nil
             ? "Pinned \(trimmedName). Visual sample was not ready."
             : "Pinned \(trimmedName) with visual sample."
@@ -321,9 +386,75 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             return false
         }
 
-        appendVisualSample(name: trimmedName, visualFingerprint: visualFingerprint)
+        appendVisualSample(
+            name: trimmedName,
+            visualFingerprint: visualFingerprint,
+            motionFingerprint: currentMotionFingerprint()
+        )
+        refreshPOIInspectionList()
         let sampleCount = currentPOIRecords().first(where: { $0.name == trimmedName })?.visualFingerprints.count ?? 0
         statusMessage = "Added visual sample \(sampleCount) for \(trimmedName)."
+        return true
+    }
+
+    @discardableResult
+    func retakeVisualSample(name: String) -> Bool {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return false }
+        guard isMapping || isLocalized else {
+            statusMessage = "Start mapping or relocalize before retaking a sample."
+            return false
+        }
+        guard let poiPosition = mapPOIs[trimmedName] else {
+            statusMessage = "Pin \(trimmedName) before retaking samples."
+            return false
+        }
+        guard let frame = session.currentFrame,
+              let visualFingerprint = frameFingerprinter.makeFingerprint(from: frame.capturedImage) else {
+            statusMessage = "Visual sample was not ready."
+            return false
+        }
+
+        upsertPOIRecord(
+            name: trimmedName,
+            position: poiPosition,
+            visualFingerprint: visualFingerprint,
+            motionFingerprint: currentMotionFingerprint(),
+            preservesExistingSamples: false
+        )
+        refreshPOIInspectionList()
+        statusMessage = "Retook visual sample for \(trimmedName)."
+        return true
+    }
+
+    @discardableResult
+    func deletePOI(named name: String) -> Bool {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return false }
+        guard mapPOIs[trimmedName] != nil || poiAnchorsByName[trimmedName] != nil else {
+            statusMessage = "\(trimmedName) is not pinned on this map."
+            return false
+        }
+
+        if let anchor = poiAnchorsByName[trimmedName] {
+            session.remove(anchor: anchor)
+        }
+
+        poiAnchorsByName.removeValue(forKey: trimmedName)
+        mapPOIs.removeValue(forKey: trimmedName)
+        anchorsList.removeAll { $0 == trimmedName }
+        removePOIRecord(name: trimmedName)
+        resetMotionReference()
+
+        if closestPOI == trimmedName {
+            closestPOI = nil
+        }
+        if selectedMapID != nil {
+            statusMessage = "Deleted \(trimmedName). Save the map to persist it."
+        } else {
+            statusMessage = "Deleted \(trimmedName)."
+        }
+        refreshPOIInspectionList()
         return true
     }
 
@@ -336,6 +467,11 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let mappingStatus = frame.worldMappingStatus
         let transform = frame.camera.transform
         let yaw = frame.camera.eulerAngles.y * 180 / .pi
+        let cameraPosition = simd_make_float3(transform.columns.3.x, transform.columns.3.y, transform.columns.3.z)
+        let cameraForward = simd_make_float3(-transform.columns.2.x, -transform.columns.2.y, -transform.columns.2.z)
+        let arHeading = headingDegrees(for: cameraForward)
+        let displayHeading = arHeading ?? Double(yaw)
+        let liveFeatureSnapshot = isMapping ? sampledFeaturePoints(from: frame.rawFeaturePoints) : nil
         let poiMatchResult = bestPOIMatch(
             cameraTransform: transform,
             capturedImage: frame.capturedImage,
@@ -347,6 +483,13 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
         DispatchQueue.main.async {
             self.mappingStatus = mappingStatus
+            self.cameraMapPosition = cameraPosition
+            self.cameraMapForward = cameraForward
+            self.arHeadingDegrees = arHeading
+            if let liveFeatureSnapshot {
+                self.mapFeaturePoints = liveFeatureSnapshot.points
+                self.mapFeaturePointCount = liveFeatureSnapshot.totalCount
+            }
             
             if self.isLocalized {
                 if let match = poiMatchResult.match {
@@ -357,7 +500,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                         format: "X %.1f  Z %.1f  HDG %.0f°\nPOI %@  %.1fm  %.0f°",
                         x,
                         z,
-                        yaw,
+                        displayHeading,
                         match.name,
                         match.distance,
                         match.angleDegrees
@@ -369,7 +512,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                         format: "X %.1f  Z %.1f  HDG %.0f°\n%@",
                         x,
                         z,
-                        yaw,
+                        displayHeading,
                         poiMatchResult.statusText ?? "Align camera with one named POI"
                     )
                 } else {
@@ -379,12 +522,12 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                         format: "X %.1f  Z %.1f  HDG %.0f°\n%@",
                         x,
                         z,
-                        yaw,
+                        displayHeading,
                         poiMatchResult.statusText ?? "No POI in view"
                     )
                 }
             } else if self.isMapping {
-                self.currentPositionText = String(format: "X %.1f  Z %.1f  HDG %.0f°", x, z, yaw)
+                self.currentPositionText = String(format: "X %.1f  Z %.1f  HDG %.0f°", x, z, displayHeading)
                 self.poiMatchStatusText = nil
             } else {
                 self.currentPositionText = ""
@@ -519,6 +662,23 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let name: String
         let position: simd_float3
         let visualFingerprints: [ARVisualFingerprint]
+        let motionFingerprint: ARPOIMotionFingerprint?
+    }
+
+    private struct ARIMUMotionState {
+        let position: SIMD2<Double>
+        let bearing: Double
+        let stepCount: Int
+        let isMoving: Bool
+        let updatedAt: Date
+    }
+
+    private struct ARIMUMotionReference {
+        let poiName: String
+        let poiPosition: simd_float3
+        let imuPosition: SIMD2<Double>
+        let stepCount: Int
+        let updatedAt: Date
     }
 
     private struct POIMatch {
@@ -586,11 +746,13 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         name: String,
         position: simd_float3,
         visualFingerprint: ARVisualFingerprint?,
+        motionFingerprint: ARPOIMotionFingerprint?,
         preservesExistingSamples: Bool
     ) {
         poiRecordsQueue.sync(flags: .barrier) {
+            let existingRecord = self.poiRecords.first(where: { $0.name == name })
             let existingSamples = preservesExistingSamples
-                ? self.poiRecords.first(where: { $0.name == name })?.visualFingerprints ?? []
+                ? existingRecord?.visualFingerprints ?? []
                 : []
             var samples = existingSamples
             if let visualFingerprint {
@@ -598,11 +760,22 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             }
             samples = Array(samples.suffix(6))
             self.poiRecords.removeAll { $0.name == name }
-            self.poiRecords.append(POIRecord(name: name, position: position, visualFingerprints: samples))
+            self.poiRecords.append(
+                POIRecord(
+                    name: name,
+                    position: position,
+                    visualFingerprints: samples,
+                    motionFingerprint: motionFingerprint ?? existingRecord?.motionFingerprint
+                )
+            )
         }
     }
 
-    private func appendVisualSample(name: String, visualFingerprint: ARVisualFingerprint) {
+    private func appendVisualSample(
+        name: String,
+        visualFingerprint: ARVisualFingerprint,
+        motionFingerprint: ARPOIMotionFingerprint?
+    ) {
         poiRecordsQueue.sync(flags: .barrier) {
             guard let index = self.poiRecords.firstIndex(where: { $0.name == name }) else { return }
             var samples = self.poiRecords[index].visualFingerprints
@@ -612,9 +785,199 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             self.poiRecords[index] = POIRecord(
                 name: existing.name,
                 position: existing.position,
-                visualFingerprints: samples
+                visualFingerprints: samples,
+                motionFingerprint: motionFingerprint ?? existing.motionFingerprint
             )
         }
+    }
+
+    private func removePOIRecord(name: String) {
+        poiRecordsQueue.sync(flags: .barrier) {
+            self.poiRecords.removeAll { $0.name == name }
+        }
+    }
+
+    private func refreshPOIInspectionList() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async {
+                self.refreshPOIInspectionList()
+            }
+            return
+        }
+
+        let records = currentPOIRecords()
+        let sampleCounts = Dictionary(uniqueKeysWithValues: records.map { ($0.name, $0.visualFingerprints.count) })
+        let recordPositions = Dictionary(uniqueKeysWithValues: records.map { ($0.name, $0.position) })
+        let names = Set(anchorsList)
+            .union(mapPOIs.keys)
+            .union(records.map(\.name))
+
+        poiInspectionList = names
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+            .compactMap { name in
+                guard let position = mapPOIs[name] ?? recordPositions[name] else { return nil }
+                return ARMapPOIInspection(
+                    name: name,
+                    position: position,
+                    visualSampleCount: sampleCounts[name] ?? 0,
+                    hasAnchor: poiAnchorsByName[name] != nil
+                )
+            }
+    }
+
+    private func sampledFeaturePoints(from pointCloud: ARPointCloud?) -> (points: [simd_float3], totalCount: Int) {
+        guard let pointCloud else { return ([], 0) }
+
+        let allPoints = Array(pointCloud.points)
+        let totalCount = allPoints.count
+        guard totalCount > maxInspectableFeaturePoints else {
+            return (allPoints, totalCount)
+        }
+
+        let sampleStride = max(1, totalCount / maxInspectableFeaturePoints)
+        var sampledPoints: [simd_float3] = []
+        sampledPoints.reserveCapacity(maxInspectableFeaturePoints)
+
+        var index = 0
+        while index < totalCount && sampledPoints.count < maxInspectableFeaturePoints {
+            sampledPoints.append(allPoints[index])
+            index += sampleStride
+        }
+
+        return (sampledPoints, totalCount)
+    }
+
+    private func currentIMUMotion() -> ARIMUMotionState? {
+        imuMotionQueue.sync {
+            latestIMUMotion
+        }
+    }
+
+    private func currentMotionReference() -> ARIMUMotionReference? {
+        imuMotionQueue.sync {
+            motionReference
+        }
+    }
+
+    private func resetMotionReference() {
+        imuMotionQueue.async(flags: .barrier) {
+            self.motionReference = nil
+        }
+    }
+
+    private func currentMotionFingerprint() -> ARPOIMotionFingerprint? {
+        guard let motion = currentIMUMotion() else { return nil }
+        return ARPOIMotionFingerprint(
+            imuX: motion.position.x,
+            imuY: motion.position.y,
+            bearing: motion.bearing,
+            stepCount: motion.stepCount,
+            createdAt: motion.updatedAt
+        )
+    }
+
+    private func recordMotionReferenceIfNeeded(for match: POIMatch, records: [POIRecord]) {
+        guard let motion = currentIMUMotion() else { return }
+        let poiPosition = position(for: match, in: records)
+
+        imuMotionQueue.async(flags: .barrier) {
+            if self.motionReference?.poiName == match.name {
+                return
+            }
+
+            self.motionReference = ARIMUMotionReference(
+                poiName: match.name,
+                poiPosition: poiPosition,
+                imuPosition: motion.position,
+                stepCount: motion.stepCount,
+                updatedAt: motion.updatedAt
+            )
+        }
+    }
+
+    private func finalizedStableResult(_ result: POIMatchResult, records: [POIRecord]) -> POIMatchResult {
+        if let match = result.match {
+            recordMotionReferenceIfNeeded(for: match, records: records)
+        }
+        return result
+    }
+
+    private func motionCheckedResult(from result: POIMatchResult, records: [POIRecord]) -> POIMatchResult {
+        guard let match = result.match,
+              let motion = currentIMUMotion(),
+              let reference = currentMotionReference() else {
+            return result
+        }
+
+        let stepsSinceReference = motion.stepCount - reference.stepCount
+        guard stepsSinceReference >= imuMotionMinimumSteps else { return result }
+
+        let imuDelta = motion.position - reference.imuPosition
+        let imuDistance = Float(simd_length(imuDelta))
+        guard imuDistance >= imuMotionMinimumDistance else { return result }
+
+        let candidatePosition = position(for: match, in: records)
+        let arDelta = SIMD2<Double>(
+            Double(candidatePosition.x - reference.poiPosition.x),
+            Double(candidatePosition.z - reference.poiPosition.z)
+        )
+        let candidateDistance = Float(simd_length(arDelta))
+        let tolerance = imuMotionTolerance(forDistance: imuDistance)
+        let mismatch = abs(candidateDistance - imuDistance)
+        let directionMismatch = motionDirectionMismatchDegrees(imuDelta: imuDelta, arDelta: arDelta)
+        let directionDisagrees = directionMismatch.map { $0 > imuMotionDirectionToleranceDegrees } ?? false
+
+        guard mismatch > tolerance || directionDisagrees else {
+            let statusText = result.statusText.map { "\($0) + IMU ok" } ?? "IMU ok"
+            return POIMatchResult(match: match, isAmbiguous: result.isAmbiguous, statusText: statusText)
+        }
+
+        let excess = max(0, mismatch - tolerance)
+        let directionPenalty: Float
+        if let directionMismatch, directionDisagrees {
+            directionPenalty = min(0.24, Float((directionMismatch - imuMotionDirectionToleranceDegrees) / 90) * 0.24)
+        } else {
+            directionPenalty = 0
+        }
+        let confidencePenalty = min(0.52, excess * 0.13 + directionPenalty)
+        let adjustedConfidence = max(0, match.confidence - confidencePenalty)
+        let directionText = directionMismatch.map { String(format: ", %.0f° off", $0) } ?? ""
+        let motionText = String(format: "IMU disagrees: walked %.1fm%@ from %@", imuDistance, directionText, reference.poiName)
+
+        if match.visualConfidence != nil || adjustedConfidence < stableMatchMinimumConfidence {
+            resetStableMatch()
+            return POIMatchResult(match: nil, isAmbiguous: false, statusText: motionText)
+        }
+
+        let adjustedMatch = POIMatch(
+            name: match.name,
+            distance: match.distance,
+            angleDegrees: match.angleDegrees,
+            confidence: adjustedConfidence,
+            score: 1 - adjustedConfidence,
+            visualConfidence: match.visualConfidence
+        )
+        return POIMatchResult(
+            match: adjustedMatch,
+            isAmbiguous: result.isAmbiguous,
+            statusText: String(format: "IMU caution %@ %.0f%%", match.name, adjustedConfidence * 100)
+        )
+    }
+
+    private func imuMotionTolerance(forDistance distance: Float) -> Float {
+        max(1.15, min(4.0, 0.65 + distance * 0.35))
+    }
+
+    private func motionDirectionMismatchDegrees(imuDelta: SIMD2<Double>, arDelta: SIMD2<Double>) -> Double? {
+        guard simd_length(imuDelta) >= Double(imuMotionDirectionMinimumDistance),
+              simd_length(arDelta) >= Double(imuMotionDirectionMinimumDistance) else {
+            return nil
+        }
+
+        let imuDirection = simd_normalize(imuDelta)
+        let arDirection = simd_normalize(arDelta)
+        let dot = max(-1, min(1, simd_dot(imuDirection, arDirection)))
+        return acos(dot) * 180 / Double.pi
     }
 
     private func bestPOIMatch(
@@ -632,12 +995,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let hasVisualSamples = records.contains { !$0.visualFingerprints.isEmpty }
 
         guard hasVisualSamples else {
-            return stableResult(
-                from: spatialResult,
+            let motionResult = motionCheckedResult(from: spatialResult, records: records)
+            let stable = stableResult(
+                from: motionResult,
                 timestamp: timestamp,
                 acceptedPrefix: "Stable AR-only",
                 waitingPrefix: "Confirming AR-only"
             )
+            return finalizedStableResult(stable, records: records)
         }
 
         guard let visualResult = bestVisualPOIMatch(
@@ -649,7 +1014,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 .map { "Need visual confirmation for \($0.name)" }
                 ?? spatialResult.statusText
                 ?? "Need visual confirmation"
-            return stableResult(
+            let stable = stableResult(
                 from: POIMatchResult(
                     match: nil,
                     isAmbiguous: spatialResult.isAmbiguous,
@@ -659,6 +1024,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 acceptedPrefix: "Stable AR+visual",
                 waitingPrefix: "Confirming AR+visual"
             )
+            return finalizedStableResult(stable, records: records)
         }
 
         let fusedResult = fuse(
@@ -667,12 +1033,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             cameraTransform: cameraTransform,
             records: records
         )
-        return stableResult(
-            from: fusedResult,
+        let motionResult = motionCheckedResult(from: fusedResult, records: records)
+        let stable = stableResult(
+            from: motionResult,
             timestamp: timestamp,
             acceptedPrefix: "Stable AR+visual",
             waitingPrefix: "Confirming AR+visual"
         )
+        return finalizedStableResult(stable, records: records)
     }
 
     private func bestSpatialPOIMatch(cameraTransform: simd_float4x4, records: [POIRecord]) -> POIMatchResult {
@@ -744,11 +1112,10 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
            bestMatch.distance > nearbySnapDistance,
            secondMatch.score - bestMatch.score < ambiguousScoreGap,
            simd_distance(position(for: bestMatch, in: records), position(for: secondMatch, in: records)) > nearbySnapDistance {
-            let selectedMatch = spatiallyPreferredMatch(bestMatch, secondMatch: secondMatch)
             return POIMatchResult(
-                match: selectedMatch,
-                isAmbiguous: false,
-                statusText: "Likely \(selectedMatch.name)"
+                match: nil,
+                isAmbiguous: true,
+                statusText: "AR ambiguous: \(bestMatch.name) / \(secondMatch.name)"
             )
         }
 
@@ -792,11 +1159,10 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
         if let secondMatch = candidates.dropFirst().first,
            bestMatch.confidence - secondMatch.confidence < visualAmbiguousConfidenceGap {
-            let selectedMatch = visuallyPreferredMatch(bestMatch, secondMatch: secondMatch)
             let result = VisualPOIMatchResult(
-                match: selectedMatch,
-                isAmbiguous: false,
-                statusText: "Visual likely \(selectedMatch.name)"
+                match: nil,
+                isAmbiguous: true,
+                statusText: "Visual ambiguous: \(bestMatch.name) / \(secondMatch.name)"
             )
             lastVisualMatchResult = result
             return result
@@ -883,10 +1249,11 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 )
             }
 
+            resetStableMatch()
             return POIMatchResult(
-                match: spatialMatch,
-                isAmbiguous: false,
-                statusText: String(format: "Likely %@ %.0f%%", spatialMatch.name, spatialMatch.confidence * 100)
+                match: nil,
+                isAmbiguous: true,
+                statusText: "AR/visual conflict: \(spatialMatch.name) / \(visualMatch.name)"
             )
         }
 
@@ -996,6 +1363,18 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         return horizontal / length
     }
 
+    private func headingDegrees(for cameraForward: simd_float3) -> Double? {
+        let horizontal = SIMD2<Double>(Double(cameraForward.x), Double(cameraForward.z))
+        guard simd_length(horizontal) > 0.001 else { return nil }
+        return normalizedDegrees(atan2(horizontal.x, horizontal.y) * 180 / Double.pi)
+    }
+
+    private func normalizedDegrees(_ degrees: Double) -> Double {
+        var normalized = degrees.truncatingRemainder(dividingBy: 360)
+        if normalized < 0 { normalized += 360 }
+        return normalized
+    }
+
     private func coneLimit(forDistance distance: Float) -> Float {
         max(8, min(32, 36 - distance * 1.35))
     }
@@ -1006,39 +1385,6 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
     private func position(for match: POIMatch, in records: [POIRecord]) -> simd_float3 {
         records.first(where: { $0.name == match.name })?.position ?? simd_make_float3(0, 0, 0)
-    }
-
-    private func spatiallyPreferredMatch(_ bestMatch: POIMatch, secondMatch: POIMatch) -> POIMatch {
-        let gap = max(0, secondMatch.score - bestMatch.score)
-        let normalizedGap = min(gap / ambiguousScoreGap, 1)
-        let confidence = max(
-            minimumPOIMatchConfidence,
-            bestMatch.confidence - spatialAmbiguityConfidencePenalty * (1 - normalizedGap)
-        )
-
-        return POIMatch(
-            name: bestMatch.name,
-            distance: bestMatch.distance,
-            angleDegrees: bestMatch.angleDegrees,
-            confidence: confidence,
-            score: 1 - confidence,
-            visualConfidence: bestMatch.visualConfidence
-        )
-    }
-
-    private func visuallyPreferredMatch(_ bestMatch: VisualPOIMatch, secondMatch: VisualPOIMatch) -> VisualPOIMatch {
-        let gap = max(0, bestMatch.confidence - secondMatch.confidence)
-        let normalizedGap = min(gap / visualAmbiguousConfidenceGap, 1)
-        let confidence = max(
-            visualAgreementConfidence,
-            bestMatch.confidence - visualAmbiguityConfidencePenalty * (1 - normalizedGap)
-        )
-
-        return VisualPOIMatch(
-            name: bestMatch.name,
-            confidence: confidence,
-            score: 1 - confidence
-        )
     }
 
     private func visualOverrideMatch(
@@ -1108,6 +1454,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     }
 }
 
+struct ARMapPOIInspection: Identifiable, Equatable {
+    var id: String { name }
+    let name: String
+    let position: simd_float3
+    let visualSampleCount: Int
+    let hasAnchor: Bool
+}
+
 struct ARStoredMapSummary: Identifiable, Codable, Equatable {
     let id: String
     var name: String
@@ -1141,11 +1495,20 @@ struct ARVisualFingerprint: Codable, Equatable {
     let createdAt: Date?
 }
 
+struct ARPOIMotionFingerprint: Codable, Equatable {
+    let imuX: Double
+    let imuY: Double
+    let bearing: Double
+    let stepCount: Int
+    let createdAt: Date?
+}
+
 struct ARStoredPOI: Codable, Equatable {
     var name: String
     var position: ARCodableVector3
     var visualFingerprint: ARVisualFingerprint? = nil
     var visualFingerprints: [ARVisualFingerprint]? = nil
+    var motionFingerprint: ARPOIMotionFingerprint? = nil
 
     var allVisualFingerprints: [ARVisualFingerprint] {
         if let visualFingerprints, !visualFingerprints.isEmpty {

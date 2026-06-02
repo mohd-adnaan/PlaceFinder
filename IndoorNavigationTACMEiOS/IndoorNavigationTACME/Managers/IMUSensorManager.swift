@@ -147,6 +147,10 @@ class IMUSensorManager: ObservableObject {
             print("IMUSensorManager: Device motion not available")
             return
         }
+
+        guard !motionManager.isDeviceMotionActive else {
+            return
+        }
         
         motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: OperationQueue()) { [weak self] motion, error in
             guard let self = self, let motion = motion else {
@@ -233,6 +237,7 @@ class IMUSensorManager: ObservableObject {
             gyroIntegrationBearing = bearing
             currentBearing = bearing
             initialBearingSet = true
+            updateIMUState()
         }
         print("IMUSensorManager: Initial bearing set to \(bearing)°")
     }

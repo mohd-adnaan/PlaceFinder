@@ -62,7 +62,14 @@ struct ARViewContainer: UIViewRepresentable {
 
 struct ARMappingView: View {
     @StateObject private var mappingManager = ARMappingManager()
+    @Binding private var sourceSelection: String
     @State private var newPOIName: String = ""
+    @State private var mapName: String = ""
+    @State private var showDeleteMapConfirm: Bool = false
+
+    init(sourceSelection: Binding<String> = .constant("")) {
+        _sourceSelection = sourceSelection
+    }
 
     var body: some View {
         ZStack {
@@ -93,8 +100,41 @@ struct ARMappingView: View {
         .navigationTitle("AR Localization")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
+        .onAppear {
+            mappingManager.refreshSavedMaps()
+            if mapName.isEmpty {
+                mapName = mappingManager.activeMapName ?? selectedSavedMap?.name ?? mappingManager.suggestedMapName()
+            }
+        }
         .onDisappear {
             mappingManager.stopMapping()
+        }
+        .onChange(of: mappingManager.selectedMapID) { _, _ in
+            if let selectedSavedMap {
+                mapName = selectedSavedMap.name
+            }
+        }
+        .onChange(of: mappingManager.activeMapName) { _, newValue in
+            if let newValue, !newValue.isEmpty {
+                mapName = newValue
+            }
+        }
+        .onChange(of: mappingManager.closestPOI) { _, newValue in
+            guard let newValue, !newValue.isEmpty, sourceSelection != newValue else { return }
+            sourceSelection = newValue
+        }
+        .alert("Delete map?", isPresented: $showDeleteMapConfirm) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                if let id = mappingManager.selectedMapID {
+                    mappingManager.deleteMap(id: id)
+                    mapName = mappingManager.selectedMapID.flatMap { id in
+                        mappingManager.savedMaps.first(where: { $0.id == id })?.name
+                    } ?? mappingManager.suggestedMapName()
+                }
+            }
+        } message: {
+            Text("This removes the saved AR map and its visual POI samples.")
         }
     }
 
@@ -142,6 +182,14 @@ struct ARMappingView: View {
                     .foregroundColor(.white.opacity(0.68))
                     .fixedSize(horizontal: false, vertical: true)
             }
+
+            if let activeMapName = mappingManager.activeMapName {
+                Label(activeMapName, systemImage: "folder")
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.white.opacity(0.76))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -162,6 +210,7 @@ struct ARMappingView: View {
             if mappingManager.sessionMode == .idle {
                 idleControls
             } else {
+                mapNameInput
                 if canPinPOI {
                     poiInput
                 }
@@ -180,17 +229,73 @@ struct ARMappingView: View {
 
     private var idleControls: some View {
         VStack(spacing: 10) {
-            Button(action: { mappingManager.startMapping() }) {
+            mapNameInput
+
+            Button(action: startNewMap) {
                 Label("Start Mapping", systemImage: "map")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(ARControlButtonStyle(prominence: .primary))
 
-            Button(action: { mappingManager.loadMapAndRelocalize() }) {
-                Label("Load Saved Map", systemImage: "location.viewfinder")
-                    .frame(maxWidth: .infinity)
+            savedMapControls
+        }
+    }
+
+    private var mapNameInput: some View {
+        TextField("Map name", text: $mapName)
+            .textInputAutocapitalization(.words)
+            .submitLabel(.done)
+            .padding(.vertical, 11)
+            .padding(.horizontal, 12)
+            .foregroundColor(.white)
+            .background(Color.white.opacity(0.10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var savedMapControls: some View {
+        VStack(spacing: 10) {
+            if mappingManager.savedMaps.isEmpty {
+                Text("No saved maps")
+                    .font(.caption.weight(.medium))
+                    .foregroundColor(.white.opacity(0.62))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Picker("Saved map", selection: selectedMapBinding) {
+                    ForEach(mappingManager.savedMaps) { map in
+                        Text(mapLabel(for: map)).tag(map.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(.white)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.10))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(Color.white.opacity(0.14), lineWidth: 1)
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                HStack(spacing: 10) {
+                    Button(action: loadSelectedMap) {
+                        Label("Load Map", systemImage: "location.viewfinder")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(ARControlButtonStyle(prominence: .secondary))
+
+                    Button(action: { showDeleteMapConfirm = true }) {
+                        Label("Delete", systemImage: "trash")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(ARControlButtonStyle(prominence: .secondary))
+                    .disabled(mappingManager.selectedMapID == nil)
+                }
             }
-            .buttonStyle(ARControlButtonStyle(prominence: .secondary))
         }
     }
 
@@ -213,12 +318,19 @@ struct ARMappingView: View {
                 Label("Pin", systemImage: "mappin.and.ellipse")
             }
             .buttonStyle(ARControlButtonStyle(prominence: .compact))
+            .disabled(trimmedPOIName.isEmpty)
+
+            Button(action: samplePOI) {
+                Label("Sample", systemImage: "camera.viewfinder")
+            }
+            .buttonStyle(ARControlButtonStyle(prominence: .compact))
+            .disabled(!canSamplePOI)
         }
     }
 
     private var activeControls: some View {
         HStack(spacing: 10) {
-            Button(action: { mappingManager.saveMap() }) {
+            Button(action: { mappingManager.saveMap(named: mapName) }) {
                 Label(mappingManager.isSavingMap ? "Saving" : saveButtonTitle, systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity)
             }
@@ -252,9 +364,44 @@ struct ARMappingView: View {
 
     private func pinPOI() {
         mappingManager.addPOIAnchor(name: newPOIName)
-        if mappingManager.statusMessage?.hasPrefix("Pinned") == true {
+    }
+
+    private func samplePOI() {
+        if mappingManager.addVisualSample(name: newPOIName) {
             newPOIName = ""
         }
+    }
+
+    private func startNewMap() {
+        if mapName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            mapName = mappingManager.suggestedMapName()
+        }
+        mappingManager.startMapping()
+    }
+
+    private func loadSelectedMap() {
+        guard let selectedID = mappingManager.selectedMapID else { return }
+        if let selectedSavedMap {
+            mapName = selectedSavedMap.name
+        }
+        mappingManager.loadMapAndRelocalize(mapID: selectedID)
+    }
+
+    private var selectedMapBinding: Binding<String> {
+        Binding(
+            get: { mappingManager.selectedMapID ?? mappingManager.savedMaps.first?.id ?? "" },
+            set: { mappingManager.selectedMapID = $0.isEmpty ? nil : $0 }
+        )
+    }
+
+    private var selectedSavedMap: ARStoredMapSummary? {
+        guard let id = mappingManager.selectedMapID else { return mappingManager.savedMaps.first }
+        return mappingManager.savedMaps.first(where: { $0.id == id })
+    }
+
+    private func mapLabel(for map: ARStoredMapSummary) -> String {
+        let suffix = map.poiCount == 1 ? "1 POI" : "\(map.poiCount) POIs"
+        return "\(map.name) (\(suffix))"
     }
 
     private var saveButtonTitle: String {
@@ -263,6 +410,15 @@ struct ARMappingView: View {
 
     private var canPinPOI: Bool {
         mappingManager.isMapping || mappingManager.isLocalized
+    }
+
+    private var trimmedPOIName: String {
+        newPOIName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var canSamplePOI: Bool {
+        guard !trimmedPOIName.isEmpty else { return false }
+        return mappingManager.mapPOIs[trimmedPOIName] != nil
     }
 
     private var statusTint: Color {

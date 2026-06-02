@@ -72,8 +72,10 @@ struct IndoorNavigationTACMEApp: App {
         ttsManager.setLanguageManager(languageManager)
 
         // Load POI names
+        var loadedPOICount = 0
         if let poiNames = POIExtractor.extractPOINames(fileName: "map_data") {
             navigationManager.setPOINames(poiNames)
+            loadedPOICount = poiNames.count
         }
 
         // Preload common phrases for translation
@@ -83,6 +85,6 @@ struct IndoorNavigationTACMEApp: App {
 
         print("IndoorNavigationTACME: All managers initialized successfully")
         DebugLogger.shared.log(.system, .success, "All managers initialized")
-        DebugLogger.shared.log(.system, .info, "POIs loaded: \(navigationManager.poiNames.count)")
+        DebugLogger.shared.log(.system, .info, "POIs loaded: \(loadedPOICount)")
     }
 }

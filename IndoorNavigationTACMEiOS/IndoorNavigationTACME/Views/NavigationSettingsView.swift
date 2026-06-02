@@ -344,7 +344,7 @@ struct NavigationSettingsView: View {
             .cornerRadius(12)
 
             // AR Localization & Mapping Button
-            NavigationLink(destination: ARMappingView()) {
+            NavigationLink(destination: ARMappingView(sourceSelection: $source)) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("AR Localization & Mapping", systemImage: "arkit")

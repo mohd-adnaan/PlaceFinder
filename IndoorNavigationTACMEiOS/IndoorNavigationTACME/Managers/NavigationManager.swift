@@ -89,8 +89,12 @@ class NavigationManager: ObservableObject {
     }
     
     func setPOINames(_ names: [String]) {
-        DispatchQueue.main.async {
-            self.poiNames = names
+        if Thread.isMainThread {
+            poiNames = names
+        } else {
+            DispatchQueue.main.async {
+                self.poiNames = names
+            }
         }
         print("NavigationManager: Set \(names.count) POI names")
     }

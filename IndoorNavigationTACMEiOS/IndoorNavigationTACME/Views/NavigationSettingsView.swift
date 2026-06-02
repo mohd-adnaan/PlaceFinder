@@ -27,6 +27,7 @@ struct NavigationSettingsView: View {
     @Binding var useClockDirections: Bool
     @Binding var useLandmarks: Bool
     @Binding var voiceControlledMode: Bool
+    @AppStorage("debugOverlayEnabled") private var debugOverlayEnabled: Bool = false
     @State private var didAutoSubmitCurrentCalibration: Bool = false
     @State private var showClearCalibrationConfirm: Bool = false
 
@@ -304,6 +305,35 @@ struct NavigationSettingsView: View {
                         let message = newValue
                             ? "Voice controlled mode enabled. Double-tap home screen to set route by voice."
                             : "Voice controlled mode disabled. Double-tap home screen for conversation."
+                        ttsManager.speak(message, force: true)
+                    }
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+
+            // Debug tools toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Debug Mode", systemImage: "terminal.fill")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.orange)
+
+                    Text("Show a small logs button on the home screen")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $debugOverlayEnabled)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: .orange))
+                    .onChange(of: debugOverlayEnabled) { newValue in
+                        let message = newValue
+                            ? "Debug mode enabled"
+                            : "Debug mode disabled"
                         ttsManager.speak(message, force: true)
                     }
             }

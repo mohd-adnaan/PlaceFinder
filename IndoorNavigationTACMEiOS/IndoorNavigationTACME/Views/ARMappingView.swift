@@ -63,7 +63,9 @@ struct ARViewContainer: UIViewRepresentable {
 
 struct ARMappingView: View {
     @EnvironmentObject private var sensorManager: IMUSensorManager
+    @EnvironmentObject private var ttsManager: TTSManager
     @StateObject private var mappingManager = ARMappingManager()
+    @StateObject private var semanticNavigator = SemanticRouteNavigator()
     @Binding private var sourceSelection: String
     @State private var newPOIName: String = ""
     @State private var mapName: String = ""
@@ -101,6 +103,20 @@ struct ARMappingView: View {
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                 }
+
+                SemanticNavigationPanel(
+                    navigator: semanticNavigator,
+                    canCaptureRoutePoint: semanticNavigator.phase == .mapping,
+                    beginWalkthrough: beginSemanticWalkthrough,
+                    captureRoutePoint: captureSemanticRoutePoint,
+                    captureTurn: captureSemanticTurn,
+                    captureLandmark: captureSemanticLandmark,
+                    saveWalkthrough: saveSemanticWalkthrough,
+                    startNavigation: startSemanticNavigation,
+                    snapToRoute: snapSemanticNavigationToRoute
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
 
                 Spacer(minLength: 24)
 
@@ -151,6 +167,15 @@ struct ARMappingView: View {
         }
         .onReceive(sensorManager.$imuState) { imuState in
             mappingManager.updateIMUMotion(imuState)
+            semanticNavigator.update(
+                imuState: imuState,
+                arPosition: mappingManager.cameraMapPosition,
+                arHeading: mappingManager.arHeadingDegrees,
+                arLocalized: mappingManager.isLocalized || mappingManager.isMapping
+            )
+        }
+        .onChange(of: semanticNavigator.speechCue?.id) { _, _ in
+            speakSemanticCue(semanticNavigator.speechCue)
         }
         .alert("Delete map?", isPresented: $showDeleteMapConfirm) {
             Button("Cancel", role: .cancel) { }
@@ -446,6 +471,16 @@ struct ARMappingView: View {
                 metricPill(title: "Density", value: mapDensityText)
                 metricPill(title: "Samples", value: "\(totalVisualSamples)")
             }
+
+            if !mappingManager.localizationCandidates.isEmpty {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(mappingManager.localizationCandidates.prefix(4)) { candidate in
+                            candidatePill(candidate)
+                        }
+                    }
+                }
+            }
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -486,6 +521,33 @@ struct ARMappingView: View {
         .padding(.vertical, 6)
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private func candidatePill(_ candidate: ARLocalizationCandidate) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 4) {
+                Text(candidate.name)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                if candidate.hasVisualEvidence {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.caption2.weight(.bold))
+                }
+            }
+
+            Text(String(format: "%.0f%% - %.0fm", candidate.confidence * 100, candidate.distance))
+                .font(.system(.caption2, design: .monospaced).weight(.medium))
+                .foregroundColor(.white.opacity(0.62))
+                .lineLimit(1)
+        }
+        .foregroundColor(.white.opacity(0.86))
+        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .frame(width: 126, alignment: .leading)
         .background(Color.white.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
@@ -591,6 +653,81 @@ struct ARMappingView: View {
     private func retakePOIFrame(_ name: String) {
         newPOIName = name
         mappingManager.retakeVisualSample(name: name)
+    }
+
+    private func beginSemanticWalkthrough(_ requestedName: String) {
+        let resolvedName = requestedName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? mappingManager.suggestedMapName()
+            : requestedName
+        if mappingManager.sessionMode == .idle {
+            mapName = resolvedName
+            mappingManager.startMapping()
+        }
+        semanticNavigator.beginRouteCapture(named: resolvedName)
+    }
+
+    private func captureSemanticLandmark(_ name: String, side: SemanticRouteSide, context: String, isDestination: Bool) {
+        semanticNavigator.captureLandmark(
+            named: name,
+            side: side,
+            context: context,
+            arPosition: mappingManager.cameraMapPosition,
+            isDestination: isDestination
+        )
+    }
+
+    private func captureSemanticRoutePoint(_ name: String) {
+        semanticNavigator.captureRoutePoint(
+            named: name,
+            arPosition: mappingManager.cameraMapPosition,
+            arHeading: mappingManager.arHeadingDegrees,
+            imuState: sensorManager.imuState
+        )
+    }
+
+    private func captureSemanticTurn(_ hint: SemanticTurnHint) {
+        semanticNavigator.captureTurn(
+            hint,
+            arPosition: mappingManager.cameraMapPosition,
+            arHeading: mappingManager.arHeadingDegrees,
+            imuState: sensorManager.imuState
+        )
+    }
+
+    private func saveSemanticWalkthrough() {
+        guard semanticNavigator.saveCapturedMap() else { return }
+
+        guard mappingManager.sessionMode != .idle else { return }
+        let resolvedName = semanticNavigator.activeMap?.name ?? mapName
+        mapName = resolvedName
+        mappingManager.saveMap(named: resolvedName)
+    }
+
+    private func startSemanticNavigation(_ target: String) {
+        semanticNavigator.startNavigation(
+            to: target,
+            arPosition: mappingManager.cameraMapPosition,
+            imuState: sensorManager.imuState
+        )
+    }
+
+    private func snapSemanticNavigationToRoute() {
+        semanticNavigator.snapToNearestGraphPose(
+            arPosition: mappingManager.cameraMapPosition,
+            imuState: sensorManager.imuState
+        )
+    }
+
+    private func speakSemanticCue(_ cue: SemanticSpeechCue?) {
+        guard let cue else { return }
+        switch cue.priority {
+        case .regular:
+            ttsManager.speak(cue.text)
+        case .priority:
+            ttsManager.speakPriority(cue.text)
+        case .critical:
+            ttsManager.speakCritical(cue.text)
+        }
     }
 
     private func startNewMap() {

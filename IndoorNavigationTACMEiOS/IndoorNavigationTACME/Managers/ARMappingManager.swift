@@ -33,6 +33,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     @Published var cameraMapForward: simd_float3?
     @Published var arHeadingDegrees: Double?
     @Published var poiInspectionList: [ARMapPOIInspection] = []
+    @Published var localizationCandidates: [ARLocalizationCandidate] = []
     
     let session = ARSession()
     private let sessionDelegateQueue = DispatchQueue(label: "placefinder.arkit.mapping.session", qos: .userInitiated)
@@ -48,6 +49,8 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     private var lastUpdateTime: TimeInterval = 0
     private var lastVisualMatchTime: TimeInterval = 0
     private var lastVisualMatchResult: VisualPOIMatchResult?
+    private var lastVisualMatchCandidates: [VisualPOIMatch]?
+    private var poseEvidenceWindow: [PoseEvidenceFrame] = []
     private var pendingStableMatchName: String?
     private var pendingStableMatchCount = 0
     private var pendingStableMatchStartTime: TimeInterval = 0
@@ -67,6 +70,11 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     private let stableMatchRequiredFrames = 5
     private let stableMatchRequiredDuration: TimeInterval = 1.2
     private let stableMatchMinimumConfidence: Float = 0.82
+    private let poseBeliefWindowDuration: TimeInterval = 2.8
+    private let poseBeliefMinimumSupportRatio: Float = 0.55
+    private let poseBeliefMinimumMargin: Float = 0.16
+    private let poseBeliefMinimumAcceptanceConfidence: Float = 0.84
+    private let poseBeliefMaximumCandidates = 6
     private let maxInspectableFeaturePoints = 1800
     private let imuMotionMinimumSteps = 2
     private let imuMotionMinimumDistance: Float = 0.8
@@ -131,6 +139,9 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         replacePOIRecords(with: [])
         lastVisualMatchTime = 0
         lastVisualMatchResult = nil
+        lastVisualMatchCandidates = nil
+        poseEvidenceWindow.removeAll()
+        localizationCandidates.removeAll()
         resetStableMatch()
         resetMotionReference()
         statusMessage = nil
@@ -152,6 +163,9 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         arHeadingDegrees = nil
         lastVisualMatchTime = 0
         lastVisualMatchResult = nil
+        lastVisualMatchCandidates = nil
+        poseEvidenceWindow.removeAll()
+        localizationCandidates.removeAll()
         resetStableMatch()
         resetMotionReference()
     }
@@ -267,6 +281,9 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                     self.lastUpdateTime = 0
                     self.lastVisualMatchTime = 0
                     self.lastVisualMatchResult = nil
+                    self.lastVisualMatchCandidates = nil
+                    self.poseEvidenceWindow.removeAll()
+                    self.localizationCandidates.removeAll()
                     self.resetStableMatch()
                     self.resetMotionReference()
                     self.statusMessage = loadedPOIs.isEmpty
@@ -305,6 +322,8 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 cameraMapPosition = nil
                 cameraMapForward = nil
                 arHeadingDegrees = nil
+                localizationCandidates.removeAll()
+                poseEvidenceWindow.removeAll()
                 poiAnchorsByName.removeAll()
                 replacePOIRecords(with: [])
                 poiInspectionList.removeAll()
@@ -490,6 +509,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 self.mapFeaturePoints = liveFeatureSnapshot.points
                 self.mapFeaturePointCount = liveFeatureSnapshot.totalCount
             }
+            self.localizationCandidates = poiMatchResult.candidates
             
             if self.isLocalized {
                 if let match = poiMatchResult.match {
@@ -595,11 +615,17 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let config = ARWorldTrackingConfiguration()
         config.initialWorldMap = initialWorldMap
         config.worldAlignment = .gravityAndHeading
-        config.planeDetection = []
+        config.planeDetection = [.horizontal, .vertical]
         config.environmentTexturing = .none
         config.isLightEstimationEnabled = false
         config.providesAudioData = false
         config.frameSemantics = []
+        if ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+            config.frameSemantics.insert(.sceneDepth)
+        }
+        if ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh) {
+            config.sceneReconstruction = .mesh
+        }
         applyEfficientVideoFormat(to: config)
         return config
     }
@@ -710,11 +736,18 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let match: POIMatch?
         let isAmbiguous: Bool
         let statusText: String?
+        let candidates: [ARLocalizationCandidate]
 
-        init(match: POIMatch?, isAmbiguous: Bool, statusText: String? = nil) {
+        init(
+            match: POIMatch?,
+            isAmbiguous: Bool,
+            statusText: String? = nil,
+            candidates: [ARLocalizationCandidate] = []
+        ) {
             self.match = match
             self.isAmbiguous = isAmbiguous
             self.statusText = statusText
+            self.candidates = candidates
         }
     }
 
@@ -728,6 +761,28 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let match: VisualPOIMatch?
         let isAmbiguous: Bool
         let statusText: String?
+    }
+
+    private struct PoseEvidence {
+        let name: String
+        let confidence: Float
+        let spatialConfidence: Float?
+        let visualConfidence: Float?
+        let distance: Float
+        let angleDegrees: Float
+        let position: simd_float3
+    }
+
+    private struct PoseEvidenceFrame {
+        let timestamp: TimeInterval
+        let candidates: [PoseEvidence]
+    }
+
+    private struct PoseBeliefCandidate {
+        let evidence: PoseEvidence
+        let confidence: Float
+        let supportRatio: Float
+        let visualSupportRatio: Float
     }
 
     private func replacePOIRecords(with records: [POIRecord]) {
@@ -929,7 +984,12 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
         guard mismatch > tolerance || directionDisagrees else {
             let statusText = result.statusText.map { "\($0) + IMU ok" } ?? "IMU ok"
-            return POIMatchResult(match: match, isAmbiguous: result.isAmbiguous, statusText: statusText)
+            return POIMatchResult(
+                match: match,
+                isAmbiguous: result.isAmbiguous,
+                statusText: statusText,
+                candidates: result.candidates
+            )
         }
 
         let excess = max(0, mismatch - tolerance)
@@ -946,7 +1006,12 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
         if match.visualConfidence != nil || adjustedConfidence < stableMatchMinimumConfidence {
             resetStableMatch()
-            return POIMatchResult(match: nil, isAmbiguous: false, statusText: motionText)
+            return POIMatchResult(
+                match: nil,
+                isAmbiguous: false,
+                statusText: motionText,
+                candidates: result.candidates
+            )
         }
 
         let adjustedMatch = POIMatch(
@@ -960,7 +1025,8 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         return POIMatchResult(
             match: adjustedMatch,
             isAmbiguous: result.isAmbiguous,
-            statusText: String(format: "IMU caution %@ %.0f%%", match.name, adjustedConfidence * 100)
+            statusText: String(format: "IMU caution %@ %.0f%%", match.name, adjustedConfidence * 100),
+            candidates: result.candidates
         )
     }
 
@@ -988,63 +1054,35 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let records = currentPOIRecords()
         guard !records.isEmpty else {
             resetStableMatch()
+            poseEvidenceWindow.removeAll()
             return POIMatchResult(match: nil, isAmbiguous: false)
         }
 
-        let spatialResult = bestSpatialPOIMatch(cameraTransform: cameraTransform, records: records)
+        let spatialCandidates = spatialPOIMatches(cameraTransform: cameraTransform, records: records)
         let hasVisualSamples = records.contains { !$0.visualFingerprints.isEmpty }
-
-        guard hasVisualSamples else {
-            let motionResult = motionCheckedResult(from: spatialResult, records: records)
-            let stable = stableResult(
-                from: motionResult,
-                timestamp: timestamp,
-                acceptedPrefix: "Stable AR-only",
-                waitingPrefix: "Confirming AR-only"
-            )
-            return finalizedStableResult(stable, records: records)
-        }
-
-        guard let visualResult = bestVisualPOIMatch(
-            capturedImage: capturedImage,
-            records: records,
-            timestamp: timestamp
-        ) else {
-            let statusText = spatialResult.match
-                .map { "Need visual confirmation for \($0.name)" }
-                ?? spatialResult.statusText
-                ?? "Need visual confirmation"
-            let stable = stableResult(
-                from: POIMatchResult(
-                    match: nil,
-                    isAmbiguous: spatialResult.isAmbiguous,
-                    statusText: statusText
-                ),
-                timestamp: timestamp,
-                acceptedPrefix: "Stable AR+visual",
-                waitingPrefix: "Confirming AR+visual"
-            )
-            return finalizedStableResult(stable, records: records)
-        }
-
-        let fusedResult = fuse(
-            spatialResult: spatialResult,
-            visualResult: visualResult,
+        let visualCandidates = hasVisualSamples
+            ? visualPOIMatches(capturedImage: capturedImage, records: records, timestamp: timestamp)
+            : nil
+        let evidence = poseEvidence(
+            spatialCandidates: spatialCandidates,
+            visualCandidates: visualCandidates ?? [],
+            requiresVisualEvidence: hasVisualSamples,
             cameraTransform: cameraTransform,
             records: records
         )
-        let motionResult = motionCheckedResult(from: fusedResult, records: records)
-        let stable = stableResult(
-            from: motionResult,
+
+        let beliefResult = temporalPoseBeliefResult(
+            from: evidence,
             timestamp: timestamp,
-            acceptedPrefix: "Stable AR+visual",
-            waitingPrefix: "Confirming AR+visual"
+            requiresVisualEvidence: hasVisualSamples,
+            visualWasAvailable: visualCandidates != nil
         )
-        return finalizedStableResult(stable, records: records)
+        let motionResult = motionCheckedResult(from: beliefResult, records: records)
+        return finalizedStableResult(motionResult, records: records)
     }
 
-    private func bestSpatialPOIMatch(cameraTransform: simd_float4x4, records: [POIRecord]) -> POIMatchResult {
-        guard !records.isEmpty else { return POIMatchResult(match: nil, isAmbiguous: false) }
+    private func spatialPOIMatches(cameraTransform: simd_float4x4, records: [POIRecord]) -> [POIMatch] {
+        guard !records.isEmpty else { return [] }
 
         let cameraPosition = simd_make_float3(
             cameraTransform.columns.3.x,
@@ -1061,7 +1099,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         )
 
         guard simd_length(cameraForward) > 0 else {
-            return POIMatchResult(match: nil, isAmbiguous: false)
+            return []
         }
 
         var candidates: [POIMatch] = []
@@ -1103,7 +1141,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             candidates.append(POIMatch(name: poi.name, distance: distance, angleDegrees: angleDegrees, confidence: confidence, score: score))
         }
 
-        let sortedCandidates = candidates.sorted { $0.score < $1.score }
+        return candidates
+            .sorted { $0.score < $1.score }
+            .prefix(poseBeliefMaximumCandidates)
+            .map { $0 }
+    }
+
+    private func bestSpatialPOIMatch(cameraTransform: simd_float4x4, records: [POIRecord]) -> POIMatchResult {
+        let sortedCandidates = spatialPOIMatches(cameraTransform: cameraTransform, records: records)
         guard let bestMatch = sortedCandidates.first else {
             return POIMatchResult(match: nil, isAmbiguous: false)
         }
@@ -1127,16 +1172,29 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         records: [POIRecord],
         timestamp: TimeInterval
     ) -> VisualPOIMatchResult? {
+        guard let candidates = visualPOIMatches(capturedImage: capturedImage, records: records, timestamp: timestamp) else {
+            return nil
+        }
+
+        return visualMatchResult(from: candidates)
+    }
+
+    private func visualPOIMatches(
+        capturedImage: CVPixelBuffer,
+        records: [POIRecord],
+        timestamp: TimeInterval
+    ) -> [VisualPOIMatch]? {
         let visualRecords = records.filter { !$0.visualFingerprints.isEmpty }
         guard !visualRecords.isEmpty else { return nil }
 
         if timestamp - lastVisualMatchTime < visualMatchInterval {
-            return lastVisualMatchResult
+            return lastVisualMatchCandidates
         }
 
         lastVisualMatchTime = timestamp
 
         guard let currentFingerprint = frameFingerprinter.makeFingerprint(from: capturedImage) else {
+            lastVisualMatchCandidates = nil
             lastVisualMatchResult = nil
             return nil
         }
@@ -1150,31 +1208,240 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             return VisualPOIMatch(name: record.name, confidence: confidence, score: 1 - confidence)
         }
         .sorted { $0.score < $1.score }
+        .prefix(poseBeliefMaximumCandidates)
+        .map { $0 }
 
+        lastVisualMatchCandidates = candidates
+        lastVisualMatchResult = visualMatchResult(from: candidates)
+        return candidates
+    }
+
+    private func visualMatchResult(from candidates: [VisualPOIMatch]) -> VisualPOIMatchResult {
         guard let bestMatch = candidates.first else {
-            let result = VisualPOIMatchResult(match: nil, isAmbiguous: false, statusText: "Visual weak")
-            lastVisualMatchResult = result
-            return result
+            return VisualPOIMatchResult(match: nil, isAmbiguous: false, statusText: "Visual weak")
         }
 
         if let secondMatch = candidates.dropFirst().first,
            bestMatch.confidence - secondMatch.confidence < visualAmbiguousConfidenceGap {
-            let result = VisualPOIMatchResult(
+            return VisualPOIMatchResult(
                 match: nil,
                 isAmbiguous: true,
                 statusText: "Visual ambiguous: \(bestMatch.name) / \(secondMatch.name)"
             )
-            lastVisualMatchResult = result
-            return result
         }
 
-        let result = VisualPOIMatchResult(
+        return VisualPOIMatchResult(
             match: bestMatch,
             isAmbiguous: false,
             statusText: String(format: "Visual %.0f%%", bestMatch.confidence * 100)
         )
-        lastVisualMatchResult = result
-        return result
+    }
+
+    private func poseEvidence(
+        spatialCandidates: [POIMatch],
+        visualCandidates: [VisualPOIMatch],
+        requiresVisualEvidence: Bool,
+        cameraTransform: simd_float4x4,
+        records: [POIRecord]
+    ) -> [PoseEvidence] {
+        let spatialByName = Dictionary(uniqueKeysWithValues: spatialCandidates.map { ($0.name, $0) })
+        let visualByName = Dictionary(uniqueKeysWithValues: visualCandidates.map { ($0.name, $0) })
+        let recordsByName = Dictionary(uniqueKeysWithValues: records.map { ($0.name, $0) })
+        let candidateNames = Set(spatialByName.keys).union(visualByName.keys)
+
+        let cameraPosition = simd_make_float3(
+            cameraTransform.columns.3.x,
+            cameraTransform.columns.3.y,
+            cameraTransform.columns.3.z
+        )
+
+        return candidateNames.compactMap { name -> PoseEvidence? in
+            guard let record = recordsByName[name] else { return nil }
+
+            let spatial = spatialByName[name]
+            let visual = visualByName[name]
+            let distance = spatial?.distance ?? simd_distance(cameraPosition, record.position)
+            let angle = spatial?.angleDegrees ?? angleToPOI(cameraTransform: cameraTransform, poiPosition: record.position)
+
+            let confidence: Float
+            if requiresVisualEvidence {
+                if let spatial, let visual {
+                    confidence = min(0.99, spatial.confidence * 0.52 + visual.confidence * 0.48 + 0.06)
+                } else if let visual {
+                    let poseCloseness = max(0, 1 - min(distance / visualDisagreementMaxDistance, 1))
+                    let closePose = visual.confidence >= visualPoseRequiredConfidence
+                        && distance <= visualDisagreementMaxDistance
+                    confidence = closePose
+                        ? min(0.90, visual.confidence * 0.72 + poseCloseness * 0.18)
+                        : min(0.64, visual.confidence * 0.66)
+                } else if let spatial {
+                    confidence = min(0.68, spatial.confidence * 0.72)
+                } else {
+                    return nil
+                }
+            } else if let spatial {
+                confidence = spatial.confidence
+            } else {
+                return nil
+            }
+
+            guard confidence >= 0.50 else { return nil }
+            return PoseEvidence(
+                name: name,
+                confidence: confidence,
+                spatialConfidence: spatial?.confidence,
+                visualConfidence: visual?.confidence,
+                distance: distance,
+                angleDegrees: angle,
+                position: record.position
+            )
+        }
+        .sorted { $0.confidence > $1.confidence }
+        .prefix(poseBeliefMaximumCandidates)
+        .map { $0 }
+    }
+
+    private func temporalPoseBeliefResult(
+        from evidence: [PoseEvidence],
+        timestamp: TimeInterval,
+        requiresVisualEvidence: Bool,
+        visualWasAvailable: Bool
+    ) -> POIMatchResult {
+        poseEvidenceWindow.append(PoseEvidenceFrame(timestamp: timestamp, candidates: evidence))
+        let oldestAllowed = timestamp - poseBeliefWindowDuration
+        poseEvidenceWindow.removeAll { $0.timestamp < oldestAllowed }
+
+        let scoredCandidates = temporalPoseCandidates()
+        let summaries = scoredCandidates.map { candidate in
+            ARLocalizationCandidate(
+                name: candidate.evidence.name,
+                confidence: candidate.confidence,
+                supportRatio: candidate.supportRatio,
+                distance: candidate.evidence.distance,
+                angleDegrees: candidate.evidence.angleDegrees,
+                hasVisualEvidence: candidate.visualSupportRatio > 0,
+                pose: candidate.evidence.position
+            )
+        }
+
+        guard let best = scoredCandidates.first else {
+            let status = requiresVisualEvidence && visualWasAvailable ? "Visual weak" : "Need visual confirmation"
+            return POIMatchResult(match: nil, isAmbiguous: false, statusText: status, candidates: summaries)
+        }
+
+        let windowDuration = (poseEvidenceWindow.last?.timestamp ?? timestamp) - (poseEvidenceWindow.first?.timestamp ?? timestamp)
+        guard poseEvidenceWindow.count >= stableMatchRequiredFrames,
+              windowDuration >= stableMatchRequiredDuration else {
+            return POIMatchResult(
+                match: nil,
+                isAmbiguous: false,
+                statusText: "Collecting pose evidence \(poseEvidenceWindow.count)/\(stableMatchRequiredFrames)",
+                candidates: summaries
+            )
+        }
+
+        if let second = scoredCandidates.dropFirst().first,
+           best.confidence - second.confidence < poseBeliefMinimumMargin {
+            resetStableMatch()
+            return POIMatchResult(
+                match: nil,
+                isAmbiguous: true,
+                statusText: String(format: "Pose ambiguous: %@ / %@ (gap %.0f%%)", best.evidence.name, second.evidence.name, (best.confidence - second.confidence) * 100),
+                candidates: summaries
+            )
+        }
+
+        guard best.confidence >= poseBeliefMinimumAcceptanceConfidence,
+              best.supportRatio >= poseBeliefMinimumSupportRatio else {
+            resetStableMatch()
+            return POIMatchResult(
+                match: nil,
+                isAmbiguous: false,
+                statusText: String(format: "Pose weak %@ %.0f%%", best.evidence.name, best.confidence * 100),
+                candidates: summaries
+            )
+        }
+
+        if requiresVisualEvidence, best.visualSupportRatio <= 0 {
+            resetStableMatch()
+            return POIMatchResult(
+                match: nil,
+                isAmbiguous: false,
+                statusText: "Need visual confirmation for \(best.evidence.name)",
+                candidates: summaries
+            )
+        }
+
+        let match = POIMatch(
+            name: best.evidence.name,
+            distance: best.evidence.distance,
+            angleDegrees: best.evidence.angleDegrees,
+            confidence: best.confidence,
+            score: 1 - best.confidence,
+            visualConfidence: best.evidence.visualConfidence
+        )
+
+        return POIMatchResult(
+            match: match,
+            isAmbiguous: false,
+            statusText: String(format: "Pose locked %@ %.0f%%", best.evidence.name, best.confidence * 100),
+            candidates: summaries
+        )
+    }
+
+    private func temporalPoseCandidates() -> [PoseBeliefCandidate] {
+        guard !poseEvidenceWindow.isEmpty else { return [] }
+
+        struct Accumulator {
+            var evidence: PoseEvidence
+            var confidenceSum: Float
+            var supportCount: Int
+            var visualSupportCount: Int
+            var latestTimestamp: TimeInterval
+        }
+
+        var accumulators: [String: Accumulator] = [:]
+        for frame in poseEvidenceWindow {
+            for evidence in frame.candidates {
+                if var accumulator = accumulators[evidence.name] {
+                    accumulator.confidenceSum += evidence.confidence
+                    accumulator.supportCount += 1
+                    if evidence.visualConfidence != nil {
+                        accumulator.visualSupportCount += 1
+                    }
+                    if frame.timestamp >= accumulator.latestTimestamp {
+                        accumulator.evidence = evidence
+                        accumulator.latestTimestamp = frame.timestamp
+                    }
+                    accumulators[evidence.name] = accumulator
+                } else {
+                    accumulators[evidence.name] = Accumulator(
+                        evidence: evidence,
+                        confidenceSum: evidence.confidence,
+                        supportCount: 1,
+                        visualSupportCount: evidence.visualConfidence == nil ? 0 : 1,
+                        latestTimestamp: frame.timestamp
+                    )
+                }
+            }
+        }
+
+        let frameCount = max(1, poseEvidenceWindow.count)
+        return accumulators.values.map { accumulator in
+            let supportRatio = Float(accumulator.supportCount) / Float(frameCount)
+            let visualSupportRatio = Float(accumulator.visualSupportCount) / Float(max(1, accumulator.supportCount))
+            let meanConfidence = accumulator.confidenceSum / Float(accumulator.supportCount)
+            let confidence = min(1, meanConfidence * 0.72 + supportRatio * 0.22 + visualSupportRatio * 0.06)
+            return PoseBeliefCandidate(
+                evidence: accumulator.evidence,
+                confidence: confidence,
+                supportRatio: supportRatio,
+                visualSupportRatio: visualSupportRatio
+            )
+        }
+        .sorted { $0.confidence > $1.confidence }
+        .prefix(poseBeliefMaximumCandidates)
+        .map { $0 }
     }
 
     private func fuse(
@@ -1460,6 +1727,17 @@ struct ARMapPOIInspection: Identifiable, Equatable {
     let position: simd_float3
     let visualSampleCount: Int
     let hasAnchor: Bool
+}
+
+struct ARLocalizationCandidate: Identifiable, Equatable {
+    var id: String { name }
+    let name: String
+    let confidence: Float
+    let supportRatio: Float
+    let distance: Float
+    let angleDegrees: Float
+    let hasVisualEvidence: Bool
+    let pose: simd_float3
 }
 
 struct ARStoredMapSummary: Identifiable, Codable, Equatable {

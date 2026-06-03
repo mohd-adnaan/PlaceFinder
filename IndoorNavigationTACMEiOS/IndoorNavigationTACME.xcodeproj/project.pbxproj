@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C0DEF0010000000000000001 /* SemanticRouteNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000003 /* SemanticRouteNavigator.swift */; };
+		C0DEF0010000000000000002 /* SemanticNavigationPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DEF0010000000000000004 /* SemanticNavigationPanel.swift */; };
 		5D55F9582FBB7D3C00AAF844 /* ARMappingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5D55F9572FBB7D3C00AAF844 /* ARMappingManager.swift */; };
 		5DF0CB5B2FBB7C98007C8AC4 /* ARMappingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DF0CB5A2FBB7C98007C8AC4 /* ARMappingView.swift */; };
 		5F3B32A52F5F8228000AADBE /* NavigationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F3B32A42F5F8224000AADBE /* NavigationSettingsView.swift */; };
@@ -43,6 +45,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		C0DEF0010000000000000003 /* SemanticRouteNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticRouteNavigator.swift; sourceTree = "<group>"; };
+		C0DEF0010000000000000004 /* SemanticNavigationPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SemanticNavigationPanel.swift; sourceTree = "<group>"; };
 		5D55F9572FBB7D3C00AAF844 /* ARMappingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMappingManager.swift; sourceTree = "<group>"; };
 		5DF0CB5A2FBB7C98007C8AC4 /* ARMappingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ARMappingView.swift; sourceTree = "<group>"; };
 		5F3B32A42F5F8224000AADBE /* NavigationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationSettingsView.swift; sourceTree = "<group>"; };
@@ -145,6 +149,7 @@
 		A50000010000000000000006 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				C0DEF0010000000000000003 /* SemanticRouteNavigator.swift */,
 				5D55F9572FBB7D3C00AAF844 /* ARMappingManager.swift */,
 				5FE9BCD32F5D38FE009F4503 /* Voicenavigationmanager.swift */,
 				5F4F75B02F3D18B3002B79DF /* NavigationManager.swift */,
@@ -184,6 +189,7 @@
 		A50000010000000000000009 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				C0DEF0010000000000000004 /* SemanticNavigationPanel.swift */,
 				5F3F2D802F678F84008261F0 /* DebugOverlayView.swift */,
 				A20000010000000000000014 /* StatusIndicatorView.swift */,
 				A20000010000000000000015 /* NavigationInputSection.swift */,
@@ -273,6 +279,7 @@
 				5F3F2D7D2F678F3C008261F0 /* DebugLogger.swift in Sources */,
 				A10000010000000000000003 /* NavigationAPIService.swift in Sources */,
 				A10000010000000000000023 /* LogWebAppService.swift in Sources */,
+				C0DEF0010000000000000001 /* SemanticRouteNavigator.swift in Sources */,
 				5D55F9582FBB7D3C00AAF844 /* ARMappingManager.swift in Sources */,
 				A10000010000000000000004 /* GeminiService.swift in Sources */,
 				A10000010000000000000005 /* IMUSensorManager.swift in Sources */,
@@ -293,6 +300,7 @@
 				A10000010000000000000016 /* StepCalibrationCard.swift in Sources */,
 				5F3F2D7F2F678F65008261F0 /* DataExportManager.swift in Sources */,
 				5DF0CB5B2FBB7C98007C8AC4 /* ARMappingView.swift in Sources */,
+				C0DEF0010000000000000002 /* SemanticNavigationPanel.swift in Sources */,
 				A10000010000000000000017 /* InstructionCard.swift in Sources */,
 				A10000010000000000000018 /* NavigationControlsView.swift in Sources */,
 				A10000010000000000000019 /* QRDetectionCard.swift in Sources */,

@@ -1,6 +1,6 @@
 require 'xcodeproj'
 
-project_path = '/Users/rehan/Projects/collabarations/PlaceFinder/IndoorNavigationTACMEiOS/IndoorNavigationTACME.xcodeproj'
+project_path = '/Users/rehan/Projects/collabarations/ic4u/IndoorNavigationTACMEiOS/IndoorNavigationTACME.xcodeproj'
 project = Xcodeproj::Project.open(project_path)
 target = project.targets.first
 

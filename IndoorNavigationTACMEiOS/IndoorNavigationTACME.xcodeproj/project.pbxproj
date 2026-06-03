@@ -475,7 +475,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = IndoorNavigationTACME/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = PlaceFinder;
+				INFOPLIST_KEY_CFBundleDisplayName = ic4u;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

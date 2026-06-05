@@ -291,15 +291,18 @@ final class SemanticRouteNavigator: ObservableObject {
     private var lastIMUPosition: Position?
     private var lastAnnouncedRemainingMeter: Int?
     private var lastAnnouncedLandmarkID: String?
+    private var announcedLandmarkIDs: Set<String> = []
     private var recoveryStartedAt: Date?
     private var lastRecoveredAt: Date?
+    private var lastRecoveryCueAt: Date?
     private var shouldSpeakLandmarks = true
 
     private let arrivalThresholdMeters = 0.45
     private let turnAnnouncementThresholdMeters = 1.0
-    private let crossTrackRecoveryThreshold = 1.25
-    private let headingRecoveryThreshold = 75.0
-    private let recoveryHoldSeconds: TimeInterval = 1.2
+    private let crossTrackRecoveryThreshold = 1.65
+    private let headingRecoveryThreshold = 105.0
+    private let recoveryHoldSeconds: TimeInterval = 2.0
+    private let recoveryCueCooldownSeconds: TimeInterval = 8.0
     private let autoSampleDistanceMeters = 0.60
     private let autoSampleTurnDegrees = 24.0
     private let autoSampleTurnMinimumDistance = 0.25
@@ -697,9 +700,25 @@ final class SemanticRouteNavigator: ObservableObject {
             currentSegmentDraftMeters = 0
         }
 
-        let nearest = nearestNode(in: workingMap, to: pose) ?? workingMap.nodes.last
+        let liveSegmentNode: SemanticRouteNode?
+        if !isDestination,
+           let lastCapturedNodeID,
+           let currentFromNode = workingMap.nodes.first(where: { $0.id == lastCapturedNodeID }) {
+            liveSegmentNode = currentFromNode
+        } else {
+            liveSegmentNode = nil
+        }
+
+        let nearest = liveSegmentNode ?? nearestNode(in: workingMap, to: pose) ?? workingMap.nodes.last
         guard let node = nearest else { return false }
-        let edge = nearestEdge(in: workingMap, to: pose)
+        let edge = liveSegmentNode == nil ? nearestEdge(in: workingMap, to: pose) : nil
+        let offsetMeters: Double?
+        if let liveSegmentNode {
+            offsetMeters = pose.map { liveSegmentNode.point.distance(to: $0) } ?? currentSegmentDraftMeters
+        } else {
+            offsetMeters = edge?.alongTrackMeters ?? currentSegmentDraftMeters
+        }
+
         if let edgeID = edge?.edge.id,
            let edgeIndex = workingMap.edges.firstIndex(where: { $0.id == edgeID }) {
             Self.attachLandmarkContext(
@@ -714,7 +733,7 @@ final class SemanticRouteNavigator: ObservableObject {
             aliases: Self.aliases(for: trimmed),
             nodeID: node.id,
             edgeID: edge?.edge.id,
-            offsetMeters: edge?.alongTrackMeters ?? currentSegmentDraftMeters,
+            offsetMeters: offsetMeters,
             side: side,
             context: context.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
             priority: isDestination ? 20 : 10,
@@ -832,9 +851,11 @@ final class SemanticRouteNavigator: ObservableObject {
         lastIMUPosition = imuState.position
         lastAnnouncedRemainingMeter = nil
         lastAnnouncedLandmarkID = nil
+        announcedLandmarkIDs.removeAll()
         shouldSpeakLandmarks = speakLandmarks
         recoveryStartedAt = nil
         lastRecoveredAt = nil
+        lastRecoveryCueAt = nil
         recoveryReason = nil
         phase = .navigating
         updateInstruction(forceSpeech: false)
@@ -859,7 +880,9 @@ final class SemanticRouteNavigator: ObservableObject {
         lastIMUPosition = nil
         lastAnnouncedRemainingMeter = nil
         lastAnnouncedLandmarkID = nil
+        announcedLandmarkIDs.removeAll()
         recoveryStartedAt = nil
+        lastRecoveryCueAt = nil
         capturedPointCount = activeMap?.nodes.count ?? 0
         capturedTurnCount = activeMap?.nodes.filter { $0.kind == .intersection }.count ?? 0
         capturedLandmarkCount = activeMap?.landmarks.count ?? 0
@@ -1139,10 +1162,12 @@ final class SemanticRouteNavigator: ObservableObject {
     }
 
     private func updateRecoveryIfNeeded(headingError: Double, crossTrackError: Double?, isMoving: Bool, arLocalized: Bool) {
-        let crossTrackBad = (crossTrackError ?? 0) > crossTrackRecoveryThreshold
-        let headingBad = isMoving && headingError > headingRecoveryThreshold
+        let crossTrackBad = arLocalized && (crossTrackError ?? 0) > crossTrackRecoveryThreshold
+        let awayFromDecisionPoint = segmentProgressMeters > 1.2 && segmentRemainingMeters > 1.2
+        let headingBad = arLocalized && isMoving && awayFromDecisionPoint && headingError > headingRecoveryThreshold
 
         guard crossTrackBad || headingBad else {
+            recoveryStartedAt = nil
             if phase == .recovering {
                 let sinceRecovery = lastRecoveredAt?.timeIntervalSinceNow ?? -10
                 if arLocalized || sinceRecovery < -1.0 {
@@ -1155,6 +1180,12 @@ final class SemanticRouteNavigator: ObservableObject {
                     speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
                 }
             }
+            return
+        }
+
+        if let lastRecoveryCueAt,
+           Date().timeIntervalSince(lastRecoveryCueAt) < recoveryCueCooldownSeconds,
+           phase == .recovering {
             return
         }
 
@@ -1173,6 +1204,7 @@ final class SemanticRouteNavigator: ObservableObject {
         }
         currentInstruction = "Pause. Slowly pan left and right while I relocalize on the route."
         speechCue = SemanticSpeechCue(text: currentInstruction, priority: .critical)
+        lastRecoveryCueAt = Date()
     }
 
     private func advanceStepOrArrive() {
@@ -1194,6 +1226,8 @@ final class SemanticRouteNavigator: ObservableObject {
         segmentProgressMeters = 0
         segmentRemainingMeters = next.edge.distanceMeters
         lastAnnouncedRemainingMeter = nil
+        lastAnnouncedLandmarkID = nil
+        announcedLandmarkIDs.removeAll()
         currentInstruction = "\(turn). Then walk \(Self.formatMeters(next.edge.distanceMeters)) toward \(next.to.name)."
         speechCue = SemanticSpeechCue(text: currentInstruction, priority: .critical)
     }
@@ -1229,8 +1263,11 @@ final class SemanticRouteNavigator: ObservableObject {
         if forceSpeech {
             speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
             lastAnnouncedRemainingMeter = bucket
-        } else if shouldSpeakLandmarks, let landmarkCue = nearbyLandmarkCue(on: step, after: segmentProgressMeters), landmarkCue.id != lastAnnouncedLandmarkID {
+        } else if shouldSpeakLandmarks,
+                  let landmarkCue = nearbyLandmarkCue(on: step, after: segmentProgressMeters),
+                  !announcedLandmarkIDs.contains(landmarkCue.id) {
             lastAnnouncedLandmarkID = landmarkCue.id
+            announcedLandmarkIDs.insert(landmarkCue.id)
             speechCue = SemanticSpeechCue(text: landmarkCue.phrase, priority: .priority)
         } else if bucket != lastAnnouncedRemainingMeter && bucket <= 8 && bucket >= 1 {
             lastAnnouncedRemainingMeter = bucket
@@ -1313,8 +1350,9 @@ final class SemanticRouteNavigator: ObservableObject {
         let reversed = step.edge.id.hasSuffix(".reverse")
         let edgeID = Self.baseEdgeID(step.edge.id)
         return map.landmarks.compactMap { landmark -> (ahead: Double, phrase: String)? in
-            guard landmark.edgeID == edgeID, let offset = landmark.offsetMeters else { return nil }
-            let landmarkProgress = reversed ? step.edge.distanceMeters - offset : offset
+            guard let landmarkProgress = landmarkProgressMeters(for: landmark, on: step, baseEdgeID: edgeID, reversed: reversed) else {
+                return nil
+            }
             let ahead = landmarkProgress - progressMeters
             guard ahead >= 0.25, ahead <= 4.0 else { return nil }
             let side = Self.side(landmark.side, reversed: reversed)
@@ -1329,15 +1367,37 @@ final class SemanticRouteNavigator: ObservableObject {
         let reversed = step.edge.id.hasSuffix(".reverse")
         let edgeID = Self.baseEdgeID(step.edge.id)
         return map.landmarks.compactMap { landmark -> (ahead: Double, id: String, phrase: String)? in
-            guard landmark.edgeID == edgeID, let offset = landmark.offsetMeters else { return nil }
-            let landmarkProgress = reversed ? step.edge.distanceMeters - offset : offset
+            guard let landmarkProgress = landmarkProgressMeters(for: landmark, on: step, baseEdgeID: edgeID, reversed: reversed) else {
+                return nil
+            }
             let ahead = landmarkProgress - progressMeters
-            guard ahead >= 0, ahead <= 1.6 else { return nil }
+            guard ahead >= -0.9, ahead <= 3.0 else { return nil }
             let side = Self.side(landmark.side, reversed: reversed)
-            return (ahead, landmark.id, "Passing \(landmark.name) \(Self.sidePhrase(side)).")
+            if ahead > 1.0 {
+                return (ahead, landmark.id, "\(landmark.name) \(Self.sidePhrase(side)) in \(Self.formatMeters(ahead)).")
+            }
+            return (abs(ahead), landmark.id, "Passing \(landmark.name) \(Self.sidePhrase(side)).")
         }
         .min { $0.ahead < $1.ahead }
         .map { ($0.id, $0.phrase) }
+    }
+
+    private func landmarkProgressMeters(
+        for landmark: SemanticRouteLandmark,
+        on step: SemanticRouteStep,
+        baseEdgeID: String,
+        reversed: Bool
+    ) -> Double? {
+        if landmark.edgeID == baseEdgeID, let offset = landmark.offsetMeters {
+            return reversed ? step.edge.distanceMeters - offset : offset
+        }
+        if landmark.nodeID == step.from.id {
+            return min(0.8, step.edge.distanceMeters)
+        }
+        if landmark.nodeID == step.to.id {
+            return max(0, step.edge.distanceMeters - 0.8)
+        }
+        return nil
     }
 
     private func resolveTarget(_ target: String, in map: SemanticRouteMap) -> SemanticRouteNode? {

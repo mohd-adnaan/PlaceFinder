@@ -70,7 +70,7 @@ struct ARMappingView: View {
     @State private var newPOIName: String = ""
     @State private var mapName: String = ""
     @State private var showDeleteMapConfirm: Bool = false
-    @State private var showsMapInspector: Bool = true
+    @State private var showsMapInspector: Bool = false
     @State private var showDeletePOIConfirm: Bool = false
     @State private var pendingDeletePOIName: String?
     @State private var didSeedIMUBearing: Bool = false
@@ -95,37 +95,26 @@ struct ARMappingView: View {
 
             VStack(spacing: 0) {
                 headerHUD
-                    .padding(.horizontal, 20)
+                    .padding(.horizontal, 18)
                     .padding(.top, 14)
 
                 if showsMapInspector && hasInspectionContent {
                     mapInspectorPanel
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
+                        .padding(.horizontal, 18)
+                        .padding(.top, 10)
                 }
 
-                SemanticNavigationPanel(
-                    navigator: semanticNavigator,
-                    canCaptureRoutePoint: semanticNavigator.phase == .mapping,
-                    beginWalkthrough: beginSemanticWalkthrough,
-                    captureRoutePoint: captureSemanticRoutePoint,
-                    captureTurn: captureSemanticTurn,
-                    captureLandmark: captureSemanticLandmark,
-                    saveWalkthrough: saveSemanticWalkthrough,
-                    startNavigation: startSemanticNavigation,
-                    snapToRoute: snapSemanticNavigationToRoute
-                )
-                .padding(.horizontal, 20)
-                .padding(.top, 12)
+                Spacer(minLength: 0)
+            }
 
-                Spacer(minLength: 24)
-
-                controlsPanel
-                    .padding(.horizontal, 20)
-                    .padding(.bottom, 22)
+            VStack {
+                Spacer(minLength: 0)
+                routeBottomSheet
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 12)
             }
         }
-        .navigationTitle("AR Localization")
+        .navigationTitle("AR Route")
         .navigationBarTitleDisplayMode(.inline)
         .toolbarBackground(.hidden, for: .navigationBar)
         .onAppear {
@@ -160,6 +149,9 @@ struct ARMappingView: View {
             if let newValue, !newValue.isEmpty {
                 mapName = newValue
             }
+        }
+        .onChange(of: mappingManager.activeMapID) { _, newValue in
+            semanticNavigator.linkActiveRouteToARWorldMap(id: newValue)
         }
         .onChange(of: mappingManager.closestPOI) { _, newValue in
             guard let newValue, !newValue.isEmpty, sourceSelection != newValue else { return }
@@ -318,6 +310,35 @@ struct ARMappingView: View {
                 .stroke(Color.white.opacity(0.12), lineWidth: 1)
         )
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var routeBottomSheet: some View {
+        SemanticNavigationPanel(
+            navigator: semanticNavigator,
+            mapName: $mapName,
+            arStatusText: statusText,
+            activeARMapName: mappingManager.activeMapName,
+            closestPOI: mappingManager.closestPOI,
+            savedARMaps: mappingManager.savedMaps,
+            selectedARMapID: mappingManager.selectedMapID,
+            canUseARPose: mappingManager.cameraMapPosition != nil && (mappingManager.isMapping || mappingManager.isLocalized),
+            isARSessionActive: mappingManager.sessionMode != .idle,
+            isSavingARMap: mappingManager.isSavingMap,
+            selectARMap: { id in
+                mappingManager.selectedMapID = id
+            },
+            startARMapping: startNewMap,
+            loadARMap: loadSelectedMap,
+            saveARMap: { mappingManager.saveMap(named: mapName) },
+            stopARSession: { mappingManager.stopMapping() },
+            beginWalkthrough: beginSemanticWalkthrough,
+            captureStart: captureSemanticStart,
+            captureTurn: captureSemanticTurn,
+            captureLandmark: captureSemanticLandmark,
+            saveWalkthrough: saveSemanticWalkthrough,
+            startNavigation: startSemanticNavigation,
+            snapToRoute: snapSemanticNavigationToRoute
+        )
     }
 
     private var idleControls: some View {
@@ -666,14 +687,34 @@ struct ARMappingView: View {
         semanticNavigator.beginRouteCapture(named: resolvedName)
     }
 
+    private func captureSemanticStart(_ name: String) {
+        let resolvedName = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? mappingManager.closestPOI ?? sourceSelection.nilIfRouteBlank ?? "Start"
+            : name
+        capturePOIEvidence(named: resolvedName)
+        semanticNavigator.captureStart(
+            named: resolvedName,
+            arPosition: mappingManager.cameraMapPosition,
+            arHeading: mappingManager.arHeadingDegrees,
+            imuState: sensorManager.imuState
+        )
+        sourceSelection = resolvedName
+    }
+
     private func captureSemanticLandmark(_ name: String, side: SemanticRouteSide, context: String, isDestination: Bool) {
-        semanticNavigator.captureLandmark(
+        let resolvedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !resolvedName.isEmpty else { return }
+        capturePOIEvidence(named: resolvedName)
+        let didCapture = semanticNavigator.captureLandmark(
             named: name,
             side: side,
             context: context,
             arPosition: mappingManager.cameraMapPosition,
             isDestination: isDestination
         )
+        if didCapture, isDestination {
+            sourceSelection = resolvedName
+        }
     }
 
     private func captureSemanticRoutePoint(_ name: String) {
@@ -707,7 +748,8 @@ struct ARMappingView: View {
         semanticNavigator.startNavigation(
             to: target,
             arPosition: mappingManager.cameraMapPosition,
-            imuState: sensorManager.imuState
+            imuState: sensorManager.imuState,
+            activeARWorldMapID: mappingManager.activeMapID
         )
     }
 
@@ -716,6 +758,17 @@ struct ARMappingView: View {
             arPosition: mappingManager.cameraMapPosition,
             imuState: sensorManager.imuState
         )
+    }
+
+    private func capturePOIEvidence(named name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if mappingManager.mapPOIs[trimmed] == nil {
+            mappingManager.addPOIAnchor(name: trimmed)
+        } else {
+            _ = mappingManager.addVisualSample(name: trimmed)
+        }
+        newPOIName = trimmed
     }
 
     private func speakSemanticCue(_ cue: SemanticSpeechCue?) {
@@ -1147,6 +1200,13 @@ private enum ARControlProminence {
     case primary
     case secondary
     case compact
+}
+
+private extension String {
+    var nilIfRouteBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
 }
 
 private struct ARControlButtonStyle: ButtonStyle {

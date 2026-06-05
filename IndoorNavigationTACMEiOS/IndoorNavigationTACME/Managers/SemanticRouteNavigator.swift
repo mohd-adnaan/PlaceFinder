@@ -37,6 +37,14 @@ enum SemanticRouteNodeKind: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum SemanticRouteLandmarkKind: String, Codable, CaseIterable, Identifiable {
+    case object
+    case recovery
+    case destinationContext
+
+    var id: String { rawValue }
+}
+
 enum SemanticRouteSide: String, Codable, CaseIterable, Identifiable {
     case center
     case left
@@ -102,6 +110,7 @@ struct SemanticRouteNode: Identifiable, Codable, Equatable {
     var turnHint: SemanticTurnHint?
     var aliases: [String]
     var capturedAt: Date
+    var poiAnchorId: String?
 }
 
 struct SemanticRouteEdge: Identifiable, Codable, Equatable {
@@ -117,6 +126,8 @@ struct SemanticRouteEdge: Identifiable, Codable, Equatable {
     var spokenContext: String?
     var isBidirectional: Bool
     var confidence: Double
+    var keyframeIds: [String]?
+    var landmarkIds: [String]?
 }
 
 struct SemanticRouteLandmark: Identifiable, Codable, Equatable {
@@ -129,6 +140,19 @@ struct SemanticRouteLandmark: Identifiable, Codable, Equatable {
     var side: SemanticRouteSide
     var context: String?
     var priority: Int
+    var kind: SemanticRouteLandmarkKind?
+    var visualFingerprintIds: [String]?
+}
+
+struct SemanticRouteKeyframe: Identifiable, Codable, Equatable {
+    var id: String
+    var segmentID: String?
+    var pose: SemanticRoutePoint
+    var headingDegrees: Double?
+    var distanceFromSegmentStart: Double
+    var visualFingerprintId: String?
+    var trackingQuality: String
+    var capturedAt: Date
 }
 
 struct SemanticRouteMap: Identifiable, Codable, Equatable {
@@ -137,13 +161,21 @@ struct SemanticRouteMap: Identifiable, Codable, Equatable {
     var createdAt: Date
     var updatedAt: Date
     var coordinateSpace: String
+    var arWorldMapId: String?
+    var startNodeId: String?
+    var destinationNodeIds: [String]?
     var nodes: [SemanticRouteNode]
     var edges: [SemanticRouteEdge]
     var landmarks: [SemanticRouteLandmark]
+    var keyframes: [SemanticRouteKeyframe]?
+    var source: String?
     var notes: String?
 
     var targetNames: [String] {
-        let nodeNames = nodes.map(\.name)
+        let destinationIDs = Set(destinationNodeIds ?? nodes.filter { $0.kind == .destination }.map(\.id))
+        let nodeNames = nodes
+            .filter { $0.kind == .destination || destinationIDs.contains($0.id) }
+            .map(\.name)
         let landmarkNames = landmarks.map(\.name)
         return Array(Set(nodeNames + landmarkNames)).sorted {
             $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
@@ -239,7 +271,11 @@ final class SemanticRouteNavigator: ObservableObject {
     @Published private(set) var lastObservation: SemanticRouteObservation?
     @Published private(set) var ragContextJSON: String = "{}"
     @Published private(set) var capturedPointCount: Int = 0
+    @Published private(set) var capturedTurnCount: Int = 0
+    @Published private(set) var capturedLandmarkCount: Int = 0
+    @Published private(set) var capturedDestinationCount: Int = 0
     @Published private(set) var capturedDistanceMeters: Double = 0
+    @Published private(set) var currentSegmentDraftMeters: Double = 0
     @Published private(set) var mappingQualityText: String = "Not mapping"
     @Published var speechCue: SemanticSpeechCue?
 
@@ -280,6 +316,39 @@ final class SemanticRouteNavigator: ObservableObject {
         activeMap?.targetNames ?? maps.first?.targetNames ?? []
     }
 
+    var canSaveCapturedMap: Bool {
+        guard let map = activeMapDraft ?? activeMap else { return false }
+        return map.nodes.contains { $0.kind == .entrance }
+            && map.nodes.contains { $0.kind == .destination }
+            && !map.edges.isEmpty
+    }
+
+    var mappingStageTitle: String {
+        guard phase == .mapping else { return phase.displayName }
+        guard let map = activeMapDraft ?? activeMap else { return "Start route map" }
+        if map.nodes.isEmpty { return "Capture Point A" }
+        if !map.nodes.contains(where: { $0.kind == .destination }) { return "Walk and mark turns" }
+        return "Review and save route"
+    }
+
+    var routeReviewLines: [String] {
+        guard let map = activeMapDraft ?? activeMap else { return [] }
+        let nodeByID = Dictionary(uniqueKeysWithValues: map.nodes.map { ($0.id, $0) })
+        var lines: [String] = []
+        if let start = map.nodes.first(where: { $0.kind == .entrance }) {
+            lines.append("Start: \(start.name)")
+        }
+        for edge in map.edges {
+            guard let from = nodeByID[edge.fromNodeID], let to = nodeByID[edge.toNodeID] else { continue }
+            let turn = to.turnHint.map { " - \($0.displayName)" } ?? ""
+            lines.append("\(Self.formatMeters(edge.distanceMeters)) from \(from.name) to \(to.name)\(turn)")
+        }
+        for landmark in map.landmarks.sorted(by: { $0.priority > $1.priority }) {
+            lines.append("\(landmark.name) \(Self.sidePhrase(landmark.side))")
+        }
+        return Array(lines.prefix(8))
+    }
+
     var activeStep: SemanticRouteStep? {
         guard currentStepIndex >= 0 && currentStepIndex < routeSteps.count else { return nil }
         return routeSteps[currentStepIndex]
@@ -304,6 +373,22 @@ final class SemanticRouteNavigator: ObservableObject {
         rebuildRAGContext()
     }
 
+    func linkActiveRouteToARWorldMap(id arWorldMapId: String?) {
+        guard let arWorldMapId,
+              var map = activeMap,
+              map.arWorldMapId != arWorldMapId else {
+            return
+        }
+        map.arWorldMapId = arWorldMapId
+        map.updatedAt = Date()
+        upsertMap(map, persist: true)
+        activeMap = map
+        if activeMapDraft?.id == map.id {
+            activeMapDraft = map
+        }
+        rebuildRAGContext()
+    }
+
     func beginRouteCapture(named requestedName: String) {
         let trimmed = requestedName.trimmingCharacters(in: .whitespacesAndNewlines)
         let name = trimmed.isEmpty ? "Semantic Route \(Self.shortTimestamp())" : trimmed
@@ -316,6 +401,8 @@ final class SemanticRouteNavigator: ObservableObject {
             nodes: [],
             edges: [],
             landmarks: [],
+            keyframes: [],
+            source: "on_device_arkit",
             notes: "Captured on-device with ARKit pose and IMU route memory."
         )
         activeMapDraft = map
@@ -325,13 +412,37 @@ final class SemanticRouteNavigator: ObservableObject {
         lastAutoSampledHeading = nil
         lastAutoSampledAt = nil
         capturedPointCount = 0
+        capturedTurnCount = 0
+        capturedLandmarkCount = 0
+        capturedDestinationCount = 0
         capturedDistanceMeters = 0
-        mappingQualityText = "Waiting for AR pose"
+        currentSegmentDraftMeters = 0
+        mappingQualityText = "Mark Point A"
         stopNavigation(resetInstruction: false)
         phase = .mapping
-        currentInstruction = "Walk the route. I will measure the path automatically."
+        currentInstruction = "Mark Point A. Use the detected POI if it is correct, or type a start label."
         speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
         rebuildRAGContext()
+    }
+
+    @discardableResult
+    func captureStart(
+        named requestedName: String,
+        arPosition: simd_float3?,
+        arHeading: Double?,
+        imuState: IMUState
+    ) -> Bool {
+        let trimmed = requestedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = trimmed.isEmpty ? "Start" : trimmed
+        return insertManualNode(
+            named: name,
+            kind: .entrance,
+            turnHint: nil,
+            arPosition: arPosition,
+            arHeading: arHeading,
+            imuState: imuState,
+            poiAnchorId: name
+        )
     }
 
     @discardableResult
@@ -363,12 +474,13 @@ final class SemanticRouteNavigator: ObservableObject {
             kind: kind,
             turnHint: nil,
             aliases: Self.aliases(for: trimmed),
-            capturedAt: Date()
+            capturedAt: Date(),
+            poiAnchorId: kind == .entrance || kind == .destination ? trimmed : nil
         )
 
         if let previousID = lastCapturedNodeID,
            let previous = workingMap.nodes.first(where: { $0.id == previousID }) {
-            let edge = Self.makeEdge(
+            var edge = Self.makeEdge(
                 from: previous,
                 to: node,
                 leftContext: nil,
@@ -376,17 +488,27 @@ final class SemanticRouteNavigator: ObservableObject {
                 spokenContext: "\(previous.name) to \(node.name)",
                 confidence: arPosition == nil ? 0.72 : 0.9
             )
+            Self.attachPendingEvidence(to: &edge, in: &workingMap, fromNodeID: previous.id)
             workingMap.edges.append(edge)
         }
 
         workingMap.nodes.append(node)
+        if kind == .entrance {
+            workingMap.startNodeId = node.id
+        } else if kind == .destination {
+            workingMap.destinationNodeIds = Array(Set((workingMap.destinationNodeIds ?? []) + [node.id]))
+        }
         workingMap.updatedAt = Date()
         activeMapDraft = workingMap
         activeMap = workingMap
         lastCapturedNodeID = node.id
+        lastAutoSampledPoint = node.point
+        lastAutoSampledHeading = node.headingDegrees
+        lastAutoSampledAt = Date()
         phase = .mapping
         currentInstruction = "Captured \(trimmed)."
         speechCue = SemanticSpeechCue(text: "Captured \(trimmed).", priority: .regular)
+        refreshCaptureMetrics(for: workingMap)
         rebuildRAGContext()
         return true
     }
@@ -407,7 +529,8 @@ final class SemanticRouteNavigator: ObservableObject {
             turnHint: nil,
             arPosition: arPosition,
             arHeading: arHeading,
-            imuState: imuState
+            imuState: imuState,
+            poiAnchorId: nil
         )
     }
 
@@ -425,7 +548,8 @@ final class SemanticRouteNavigator: ObservableObject {
             turnHint: hint,
             arPosition: arPosition,
             arHeading: arHeading,
-            imuState: imuState
+            imuState: imuState,
+            poiAnchorId: nil
         )
     }
 
@@ -435,10 +559,16 @@ final class SemanticRouteNavigator: ObservableObject {
         turnHint: SemanticTurnHint?,
         arPosition: simd_float3?,
         arHeading: Double?,
-        imuState: IMUState
+        imuState: IMUState,
+        poiAnchorId: String?
     ) -> Bool {
         guard phase == .mapping else { return false }
         guard var workingMap = activeMapDraft ?? activeMap else { return false }
+        if workingMap.nodes.isEmpty, kind != .entrance {
+            currentInstruction = "Mark Point A before adding turns, landmarks, or the destination."
+            speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
+            return false
+        }
 
         let pose = Self.routePoint(from: arPosition) ?? SemanticRoutePoint(
             x: imuState.position.x,
@@ -454,12 +584,19 @@ final class SemanticRouteNavigator: ObservableObject {
             workingMap.nodes[previousIndex].turnHint = turnHint
             workingMap.nodes[previousIndex].headingDegrees = heading
             workingMap.nodes[previousIndex].aliases = Self.aliases(for: name)
+            workingMap.nodes[previousIndex].poiAnchorId = poiAnchorId
+            if kind == .entrance {
+                workingMap.startNodeId = workingMap.nodes[previousIndex].id
+            } else if kind == .destination {
+                workingMap.destinationNodeIds = Array(Set((workingMap.destinationNodeIds ?? []) + [workingMap.nodes[previousIndex].id]))
+            }
             workingMap.updatedAt = Date()
             activeMapDraft = workingMap
             activeMap = workingMap
             lastAutoSampledPoint = workingMap.nodes[previousIndex].point
             lastAutoSampledHeading = heading
             lastAutoSampledAt = Date()
+            currentSegmentDraftMeters = 0
             refreshCaptureMetrics(for: workingMap)
             currentInstruction = kind == .intersection
                 ? "Marked \(name). Continue walking after the turn."
@@ -477,23 +614,30 @@ final class SemanticRouteNavigator: ObservableObject {
             kind: kind,
             turnHint: turnHint,
             aliases: Self.aliases(for: name),
-            capturedAt: Date()
+            capturedAt: Date(),
+            poiAnchorId: poiAnchorId
         )
 
         if let previousID = lastCapturedNodeID,
            let previous = workingMap.nodes.first(where: { $0.id == previousID }) {
-            let edge = Self.makeEdge(
+            var edge = Self.makeEdge(
                 from: previous,
                 to: node,
                 leftContext: nil,
                 rightContext: nil,
-                spokenContext: kind == .intersection ? "toward \(name)" : "along the mapped route",
+                spokenContext: kind == .destination ? "toward \(name)" : "toward \(name)",
                 confidence: arPosition == nil ? 0.72 : 0.94
             )
+            Self.attachPendingEvidence(to: &edge, in: &workingMap, fromNodeID: previous.id)
             workingMap.edges.append(edge)
         }
 
         workingMap.nodes.append(node)
+        if kind == .entrance {
+            workingMap.startNodeId = node.id
+        } else if kind == .destination {
+            workingMap.destinationNodeIds = Array(Set((workingMap.destinationNodeIds ?? []) + [node.id]))
+        }
         workingMap.updatedAt = Date()
         activeMapDraft = workingMap
         activeMap = workingMap
@@ -501,10 +645,15 @@ final class SemanticRouteNavigator: ObservableObject {
         lastAutoSampledPoint = node.point
         lastAutoSampledHeading = heading
         lastAutoSampledAt = Date()
+        currentSegmentDraftMeters = 0
         refreshCaptureMetrics(for: workingMap)
         currentInstruction = kind == .intersection
             ? "Marked \(name). Continue walking after the turn."
-            : "Captured route point \(name)."
+            : kind == .entrance
+                ? "Point A captured. Walk toward the first turn or destination."
+                : kind == .destination
+                    ? "Destination \(name) captured. Review and save the route."
+                    : "Captured route point \(name)."
         speechCue = SemanticSpeechCue(text: currentInstruction, priority: .regular)
         rebuildRAGContext()
         return true
@@ -540,6 +689,8 @@ final class SemanticRouteNavigator: ObservableObject {
             lastCapturedNodeID = ensured.id
             lastAutoSampledPoint = ensured.point
             lastAutoSampledHeading = ensured.headingDegrees ?? lastAutoSampledHeading
+            lastAutoSampledAt = Date()
+            currentSegmentDraftMeters = 0
         }
 
         let nearest = nearestNode(in: workingMap, to: pose) ?? workingMap.nodes.last
@@ -559,10 +710,12 @@ final class SemanticRouteNavigator: ObservableObject {
             aliases: Self.aliases(for: trimmed),
             nodeID: node.id,
             edgeID: edge?.edge.id,
-            offsetMeters: edge?.alongTrackMeters,
+            offsetMeters: edge?.alongTrackMeters ?? currentSegmentDraftMeters,
             side: side,
             context: context.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
-            priority: isDestination ? 20 : 10
+            priority: isDestination ? 20 : 10,
+            kind: isDestination ? .destinationContext : .object,
+            visualFingerprintIds: [trimmed]
         )
         workingMap.landmarks.removeAll { Self.matches($0.name, trimmed) }
         workingMap.landmarks.append(landmark)
@@ -581,8 +734,8 @@ final class SemanticRouteNavigator: ObservableObject {
     @discardableResult
     func saveCapturedMap() -> Bool {
         guard var map = activeMapDraft ?? activeMap else { return false }
-        guard map.nodes.count >= 2 else {
-            currentInstruction = "Walk at least one measured segment before saving."
+        guard canSaveCapturedMap else {
+            currentInstruction = "Capture Point A, at least one measured segment, and a destination before saving."
             speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
             return false
         }
@@ -609,7 +762,12 @@ final class SemanticRouteNavigator: ObservableObject {
     }
 
     @discardableResult
-    func startNavigation(to requestedTarget: String, arPosition: simd_float3?, imuState: IMUState) -> Bool {
+    func startNavigation(
+        to requestedTarget: String,
+        arPosition: simd_float3?,
+        imuState: IMUState,
+        activeARWorldMapID: String? = nil
+    ) -> Bool {
         guard let map = activeMap else {
             currentInstruction = "No semantic map loaded."
             return false
@@ -617,6 +775,12 @@ final class SemanticRouteNavigator: ObservableObject {
         let trimmed = requestedTarget.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             currentInstruction = "Choose a target."
+            return false
+        }
+        if let requiredARMapID = map.arWorldMapId,
+           requiredARMapID != activeARWorldMapID {
+            currentInstruction = "Load the matching AR map for this route before guiding."
+            speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
             return false
         }
         if map.coordinateSpace == "ar_world_xz", arPosition == nil {
@@ -678,12 +842,16 @@ final class SemanticRouteNavigator: ObservableObject {
         segmentRemainingMeters = 0
         totalRemainingMeters = 0
         confidence = 0
+        currentSegmentDraftMeters = 0
         recoveryReason = nil
         lastIMUStepCount = nil
         lastIMUPosition = nil
         lastAnnouncedRemainingMeter = nil
         recoveryStartedAt = nil
         capturedPointCount = activeMap?.nodes.count ?? 0
+        capturedTurnCount = activeMap?.nodes.filter { $0.kind == .intersection }.count ?? 0
+        capturedLandmarkCount = activeMap?.landmarks.count ?? 0
+        capturedDestinationCount = activeMap?.nodes.filter { $0.kind == .destination }.count ?? 0
         capturedDistanceMeters = activeMap?.edges.reduce(0) { $0 + $1.distanceMeters } ?? 0
         mappingQualityText = activeMap == nil ? "Not mapping" : "Loaded map"
         if phase == .navigating || phase == .recovering || phase == .arrived {
@@ -803,6 +971,7 @@ final class SemanticRouteNavigator: ObservableObject {
     private func autoSampleWalkthrough(arPosition: simd_float3?, arHeading: Double?, arLocalized: Bool) {
         guard arLocalized, let pose = Self.routePoint(from: arPosition), var workingMap = activeMapDraft ?? activeMap else {
             mappingQualityText = "Waiting for AR tracking"
+            currentSegmentDraftMeters = 0
             return
         }
 
@@ -810,32 +979,12 @@ final class SemanticRouteNavigator: ObservableObject {
         let heading = arHeading ?? lastAutoSampledHeading ?? 0
 
         if workingMap.nodes.isEmpty {
-            let start = SemanticRouteNode(
-                id: UUID().uuidString,
-                name: "Start",
-                point: pose,
-                headingDegrees: heading,
-                kind: .entrance,
-                turnHint: nil,
-                aliases: ["start", "starting point"],
-                capturedAt: now
-            )
-            workingMap.nodes.append(start)
-            workingMap.updatedAt = now
-            activeMapDraft = workingMap
-            activeMap = workingMap
-            lastCapturedNodeID = start.id
-            lastAutoSampledPoint = pose
-            lastAutoSampledHeading = heading
-            lastAutoSampledAt = now
-            refreshCaptureMetrics(for: workingMap)
-            mappingQualityText = "Measuring"
-            currentInstruction = "Start point captured. Keep walking the route."
+            mappingQualityText = "Ready for Point A"
+            currentInstruction = "Mark Point A before walking."
             return
         }
 
-        guard let previousPoint = lastAutoSampledPoint,
-              let previousID = lastCapturedNodeID,
+        guard let previousID = lastCapturedNodeID,
               let previousNode = workingMap.nodes.first(where: { $0.id == previousID }) else {
             lastAutoSampledPoint = pose
             lastAutoSampledHeading = heading
@@ -843,50 +992,40 @@ final class SemanticRouteNavigator: ObservableObject {
             return
         }
 
-        let distance = previousPoint.distance(to: pose)
+        currentSegmentDraftMeters = previousNode.point.distance(to: pose)
+        capturedDistanceMeters = workingMap.edges.reduce(0) { $0 + $1.distanceMeters } + currentSegmentDraftMeters
+
+        let keyframeDistance = (lastAutoSampledPoint ?? previousNode.point).distance(to: pose)
         let headingDelta = abs(SemanticRouteMath.signedAngleDifference(heading, lastAutoSampledHeading ?? heading))
         let timeDelta = now.timeIntervalSince(lastAutoSampledAt ?? .distantPast)
-        let shouldSampleByDistance = distance >= autoSampleDistanceMeters
-        let shouldSampleByTurn = distance >= autoSampleTurnMinimumDistance && headingDelta >= autoSampleTurnDegrees
+        let shouldSampleByDistance = keyframeDistance >= 0.75
+        let shouldSampleByTurn = keyframeDistance >= autoSampleTurnMinimumDistance && headingDelta >= autoSampleTurnDegrees
         guard timeDelta >= 0.25, shouldSampleByDistance || shouldSampleByTurn else {
-            mappingQualityText = String(format: "Measuring %.1fm", capturedDistanceMeters + distance)
+            mappingQualityText = String(format: "Live segment %.1fm", currentSegmentDraftMeters)
             return
         }
 
-        let nodeKind: SemanticRouteNodeKind = shouldSampleByTurn ? .intersection : .waypoint
-        let nodeName = nodeKind == .intersection
-            ? "Turn \(workingMap.nodes.filter { $0.kind == .intersection }.count + 1)"
-            : "Point \(workingMap.nodes.count + 1)"
-        let node = SemanticRouteNode(
+        let keyframe = SemanticRouteKeyframe(
             id: UUID().uuidString,
-            name: nodeName,
-            point: pose,
+            segmentID: nil,
+            pose: pose,
             headingDegrees: heading,
-            kind: nodeKind,
-            turnHint: nil,
-            aliases: Self.aliases(for: nodeName),
+            distanceFromSegmentStart: currentSegmentDraftMeters,
+            visualFingerprintId: nil,
+            trackingQuality: arLocalized ? "ar_world_tracking" : "pdr",
             capturedAt: now
         )
-        let edge = Self.makeEdge(
-            from: previousNode,
-            to: node,
-            leftContext: nil,
-            rightContext: nil,
-            spokenContext: "along the mapped route",
-            confidence: arLocalized ? 0.92 : 0.72
-        )
-        workingMap.nodes.append(node)
-        workingMap.edges.append(edge)
+        var keyframes = workingMap.keyframes ?? []
+        keyframes.append(keyframe)
+        workingMap.keyframes = Array(keyframes.suffix(120))
         workingMap.updatedAt = now
         activeMapDraft = workingMap
         activeMap = workingMap
-        lastCapturedNodeID = node.id
         lastAutoSampledPoint = pose
         lastAutoSampledHeading = heading
         lastAutoSampledAt = now
         refreshCaptureMetrics(for: workingMap)
-        mappingQualityText = String(format: "%d points, %.1fm", capturedPointCount, capturedDistanceMeters)
-        currentInstruction = String(format: "Mapping live: %d points, %.1f meters.", capturedPointCount, capturedDistanceMeters)
+        mappingQualityText = String(format: "Live segment %.1fm, %d keyframes", currentSegmentDraftMeters, workingMap.keyframes?.count ?? 0)
         rebuildRAGContext()
     }
 
@@ -901,6 +1040,8 @@ final class SemanticRouteNavigator: ObservableObject {
                 map.nodes[lastIndex].name = name
                 map.nodes[lastIndex].kind = .destination
                 map.nodes[lastIndex].aliases = Self.aliases(for: name)
+                map.nodes[lastIndex].poiAnchorId = name
+                map.destinationNodeIds = Array(Set((map.destinationNodeIds ?? []) + [map.nodes[lastIndex].id]))
                 return map.nodes[lastIndex]
             }
             return nil
@@ -912,6 +1053,8 @@ final class SemanticRouteNavigator: ObservableObject {
             map.nodes[lastIndex].name = name
             map.nodes[lastIndex].kind = .destination
             map.nodes[lastIndex].aliases = Self.aliases(for: name)
+            map.nodes[lastIndex].poiAnchorId = name
+            map.destinationNodeIds = Array(Set((map.destinationNodeIds ?? []) + [map.nodes[lastIndex].id]))
             return map.nodes[lastIndex]
         }
 
@@ -923,12 +1066,13 @@ final class SemanticRouteNavigator: ObservableObject {
             kind: .destination,
             turnHint: nil,
             aliases: Self.aliases(for: name),
-            capturedAt: Date()
+            capturedAt: Date(),
+            poiAnchorId: name
         )
 
         if let previousID = lastCapturedNodeID,
            let previous = map.nodes.first(where: { $0.id == previousID }) {
-            let edge = Self.makeEdge(
+            var edge = Self.makeEdge(
                 from: previous,
                 to: target,
                 leftContext: nil,
@@ -936,21 +1080,29 @@ final class SemanticRouteNavigator: ObservableObject {
                 spokenContext: "toward \(name)",
                 confidence: arPositionWasAvailable ? 0.9 : 0.7
             )
+            Self.attachPendingEvidence(to: &edge, in: &map, fromNodeID: previous.id)
             map.edges.append(edge)
         }
 
         map.nodes.append(target)
+        map.destinationNodeIds = Array(Set((map.destinationNodeIds ?? []) + [target.id]))
         map.updatedAt = Date()
         return target
     }
 
     private func refreshCaptureMetrics(for map: SemanticRouteMap) {
         capturedPointCount = map.nodes.count
+        capturedTurnCount = map.nodes.filter { $0.kind == .intersection }.count
+        capturedLandmarkCount = map.landmarks.count
+        capturedDestinationCount = map.nodes.filter { $0.kind == .destination }.count
         capturedDistanceMeters = map.edges.reduce(0) { $0 + $1.distanceMeters }
         if phase == .mapping {
+            capturedDistanceMeters += currentSegmentDraftMeters
+        }
+        if phase == .mapping {
             mappingQualityText = capturedPointCount < 2
-                ? "Need one measured segment"
-                : String(format: "%d points, %.1fm", capturedPointCount, capturedDistanceMeters)
+                ? "Need Point A and destination"
+                : String(format: "%d route points, %.1fm", capturedPointCount, capturedDistanceMeters)
         } else {
             mappingQualityText = String(format: "%d points, %.1fm", capturedPointCount, capturedDistanceMeters)
         }
@@ -1302,7 +1454,9 @@ final class SemanticRouteNavigator: ObservableObject {
                     rightContext: storedEdge.leftContext,
                     spokenContext: "toward \(to.name)",
                     isBidirectional: true,
-                    confidence: storedEdge.confidence
+                    confidence: storedEdge.confidence,
+                    keyframeIds: storedEdge.keyframeIds,
+                    landmarkIds: storedEdge.landmarkIds
                 )
             }
             steps.append(SemanticRouteStep(edge: edge, from: from, to: to))
@@ -1392,7 +1546,9 @@ final class SemanticRouteNavigator: ObservableObject {
             rightContext: rightContext,
             spokenContext: spokenContext,
             isBidirectional: true,
-            confidence: confidence
+            confidence: confidence,
+            keyframeIds: nil,
+            landmarkIds: nil
         )
     }
 
@@ -1410,6 +1566,45 @@ final class SemanticRouteNavigator: ObservableObject {
         case .center, .ahead, .behind:
             edge.spokenContext = appendedContext(edge.spokenContext, phrase)
         }
+    }
+
+    private static func attachPendingEvidence(
+        to edge: inout SemanticRouteEdge,
+        in map: inout SemanticRouteMap,
+        fromNodeID: String
+    ) {
+        var landmarkIds = edge.landmarkIds ?? []
+        for index in map.landmarks.indices {
+            guard map.landmarks[index].edgeID == nil,
+                  map.landmarks[index].nodeID == fromNodeID else {
+                continue
+            }
+            map.landmarks[index].edgeID = edge.id
+            if let offset = map.landmarks[index].offsetMeters {
+                map.landmarks[index].offsetMeters = min(max(offset, 0), edge.distanceMeters)
+            }
+            landmarkIds.append(map.landmarks[index].id)
+            attachLandmarkContext(
+                name: map.landmarks[index].name,
+                side: map.landmarks[index].side,
+                to: &edge
+            )
+        }
+        edge.landmarkIds = landmarkIds.isEmpty ? nil : Array(Set(landmarkIds))
+
+        var keyframeIds = edge.keyframeIds ?? []
+        guard var keyframes = map.keyframes else { return }
+        for index in keyframes.indices {
+            guard keyframes[index].segmentID == nil,
+                  keyframes[index].distanceFromSegmentStart <= edge.distanceMeters + 0.75 else {
+                continue
+            }
+            keyframes[index].segmentID = edge.id
+            keyframes[index].distanceFromSegmentStart = min(max(keyframes[index].distanceFromSegmentStart, 0), edge.distanceMeters)
+            keyframeIds.append(keyframes[index].id)
+        }
+        map.keyframes = keyframes
+        edge.keyframeIds = keyframeIds.isEmpty ? nil : Array(Set(keyframeIds))
     }
 
     private static func appendedContext(_ existing: String?, _ addition: String) -> String {

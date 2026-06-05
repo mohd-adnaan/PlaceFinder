@@ -20,6 +20,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     @Published var sessionMode: ARMappingSessionMode = .idle
     @Published var savedMaps: [ARStoredMapSummary] = []
     @Published var selectedMapID: String?
+    @Published var activeMapID: String?
     @Published var activeMapName: String?
     @Published var currentPositionText: String = ""
     @Published var statusMessage: String?
@@ -123,6 +124,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         sessionMode = .mapping
         mappingStatus = .notAvailable
         activeMapMetadata = nil
+        activeMapID = nil
         activeMapName = nil
         currentPositionText = ""
         closestPOI = nil
@@ -210,6 +212,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                         self.isSavingMap = false
                         self.savedMapURL = self.mapStore.worldMapURL(for: metadata)
                         self.activeMapMetadata = metadata
+                        self.activeMapID = metadata.id
                         self.activeMapName = metadata.name
                         self.selectedMapID = metadata.id
                         self.mapFeaturePoints = featureSnapshot.points
@@ -268,6 +271,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                     self.mapFeaturePointCount = featureSnapshot.totalCount
                     self.refreshPOIInspectionList()
                     self.activeMapMetadata = metadata
+                    self.activeMapID = metadata.id
                     self.activeMapName = metadata.name
                     self.selectedMapID = metadata.id
                     self.isRelocalizing = true
@@ -314,6 +318,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             try mapStore.delete(id: id)
             if activeMapMetadata?.id == id {
                 activeMapMetadata = nil
+                activeMapID = nil
                 activeMapName = nil
                 anchorsList.removeAll()
                 mapPOIs.removeAll()

@@ -176,7 +176,9 @@ struct SemanticRouteMap: Identifiable, Codable, Equatable {
         let nodeNames = nodes
             .filter { $0.kind == .destination || destinationIDs.contains($0.id) }
             .map(\.name)
-        let landmarkNames = landmarks.map(\.name)
+        let landmarkNames = landmarks
+            .filter { $0.kind == .destinationContext || $0.priority >= 20 }
+            .map(\.name)
         return Array(Set(nodeNames + landmarkNames)).sorted {
             $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
         }
@@ -288,8 +290,10 @@ final class SemanticRouteNavigator: ObservableObject {
     private var lastIMUStepCount: Int?
     private var lastIMUPosition: Position?
     private var lastAnnouncedRemainingMeter: Int?
+    private var lastAnnouncedLandmarkID: String?
     private var recoveryStartedAt: Date?
     private var lastRecoveredAt: Date?
+    private var shouldSpeakLandmarks = true
 
     private let arrivalThresholdMeters = 0.45
     private let turnAnnouncementThresholdMeters = 1.0
@@ -766,7 +770,8 @@ final class SemanticRouteNavigator: ObservableObject {
         to requestedTarget: String,
         arPosition: simd_float3?,
         imuState: IMUState,
-        activeARWorldMapID: String? = nil
+        activeARWorldMapID: String? = nil,
+        speakLandmarks: Bool = true
     ) -> Bool {
         guard let map = activeMap else {
             currentInstruction = "No semantic map loaded."
@@ -826,11 +831,17 @@ final class SemanticRouteNavigator: ObservableObject {
         lastIMUStepCount = imuState.stepCount
         lastIMUPosition = imuState.position
         lastAnnouncedRemainingMeter = nil
+        lastAnnouncedLandmarkID = nil
+        shouldSpeakLandmarks = speakLandmarks
         recoveryStartedAt = nil
         lastRecoveredAt = nil
         recoveryReason = nil
         phase = .navigating
-        updateInstruction(forceSpeech: true)
+        updateInstruction(forceSpeech: false)
+        let startName = steps.first?.from.name ?? "your current location"
+        let firstInstruction = currentInstruction
+        currentInstruction = "Starting at \(startName). \(firstInstruction)"
+        speechCue = SemanticSpeechCue(text: currentInstruction, priority: .critical)
         rebuildRAGContext()
         return true
     }
@@ -847,6 +858,7 @@ final class SemanticRouteNavigator: ObservableObject {
         lastIMUStepCount = nil
         lastIMUPosition = nil
         lastAnnouncedRemainingMeter = nil
+        lastAnnouncedLandmarkID = nil
         recoveryStartedAt = nil
         capturedPointCount = activeMap?.nodes.count ?? 0
         capturedTurnCount = activeMap?.nodes.filter { $0.kind == .intersection }.count ?? 0
@@ -1138,7 +1150,9 @@ final class SemanticRouteNavigator: ObservableObject {
                     recoveryReason = nil
                     recoveryStartedAt = nil
                     lastRecoveredAt = Date()
-                    updateInstruction(forceSpeech: true)
+                    updateInstruction(forceSpeech: false)
+                    currentInstruction = "Recovered on the route. Resume walking."
+                    speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
                 }
             }
             return
@@ -1203,7 +1217,7 @@ final class SemanticRouteNavigator: ObservableObject {
             let turn = Self.turnInstruction(at: step.to, from: step.edge.bearingDegrees, to: next.edge.bearingDegrees)
             currentInstruction = "In \(Self.formatMeters(segmentRemainingMeters)), \(turn)."
         } else {
-            let landmarkContext = nextLandmarkPhrase(on: step, after: segmentProgressMeters)
+            let landmarkContext = shouldSpeakLandmarks ? nextLandmarkPhrase(on: step, after: segmentProgressMeters) : nil
             if let landmarkContext {
                 currentInstruction = "Walk \(Self.formatMeters(segmentRemainingMeters)) \(context), passing \(landmarkContext)."
             } else {
@@ -1215,6 +1229,9 @@ final class SemanticRouteNavigator: ObservableObject {
         if forceSpeech {
             speechCue = SemanticSpeechCue(text: currentInstruction, priority: .priority)
             lastAnnouncedRemainingMeter = bucket
+        } else if shouldSpeakLandmarks, let landmarkCue = nearbyLandmarkCue(on: step, after: segmentProgressMeters), landmarkCue.id != lastAnnouncedLandmarkID {
+            lastAnnouncedLandmarkID = landmarkCue.id
+            speechCue = SemanticSpeechCue(text: landmarkCue.phrase, priority: .priority)
         } else if bucket != lastAnnouncedRemainingMeter && bucket <= 8 && bucket >= 1 {
             lastAnnouncedRemainingMeter = bucket
             let cue: String
@@ -1305,6 +1322,22 @@ final class SemanticRouteNavigator: ObservableObject {
         }
         .min { $0.ahead < $1.ahead }?
         .phrase
+    }
+
+    private func nearbyLandmarkCue(on step: SemanticRouteStep, after progressMeters: Double) -> (id: String, phrase: String)? {
+        guard let map = activeMap else { return nil }
+        let reversed = step.edge.id.hasSuffix(".reverse")
+        let edgeID = Self.baseEdgeID(step.edge.id)
+        return map.landmarks.compactMap { landmark -> (ahead: Double, id: String, phrase: String)? in
+            guard landmark.edgeID == edgeID, let offset = landmark.offsetMeters else { return nil }
+            let landmarkProgress = reversed ? step.edge.distanceMeters - offset : offset
+            let ahead = landmarkProgress - progressMeters
+            guard ahead >= 0, ahead <= 1.6 else { return nil }
+            let side = Self.side(landmark.side, reversed: reversed)
+            return (ahead, landmark.id, "Passing \(landmark.name) \(Self.sidePhrase(side)).")
+        }
+        .min { $0.ahead < $1.ahead }
+        .map { ($0.id, $0.phrase) }
     }
 
     private func resolveTarget(_ target: String, in map: SemanticRouteMap) -> SemanticRouteNode? {

@@ -74,6 +74,8 @@ struct ARMappingView: View {
     @State private var showDeletePOIConfirm: Bool = false
     @State private var pendingDeletePOIName: String?
     @State private var didSeedIMUBearing: Bool = false
+    @State private var lastSpokenSemanticCueText: String?
+    @State private var lastSpokenSemanticCueAt: Date?
 
     init(sourceSelection: Binding<String> = .constant("")) {
         _sourceSelection = sourceSelection
@@ -93,26 +95,19 @@ struct ARMappingView: View {
                     .ignoresSafeArea()
             }
 
-            VStack(spacing: 0) {
-                headerHUD
-                    .padding(.horizontal, 18)
-                    .padding(.top, 14)
-
-                if showsMapInspector && hasInspectionContent {
+            if showsMapInspector && hasInspectionContent {
+                VStack {
                     mapInspectorPanel
-                        .padding(.horizontal, 18)
-                        .padding(.top, 10)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                    Spacer(minLength: 0)
                 }
-
-                Spacer(minLength: 0)
             }
-
-            VStack {
-                Spacer(minLength: 0)
-                routeBottomSheet
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 12)
-            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            routeBottomSheet
+                .padding(.horizontal, 14)
+                .padding(.bottom, 10)
         }
         .navigationTitle("AR Route")
         .navigationBarTitleDisplayMode(.inline)
@@ -744,12 +739,13 @@ struct ARMappingView: View {
         mappingManager.saveMap(named: resolvedName)
     }
 
-    private func startSemanticNavigation(_ target: String) {
+    private func startSemanticNavigation(_ target: String, speakLandmarks: Bool) {
         semanticNavigator.startNavigation(
             to: target,
             arPosition: mappingManager.cameraMapPosition,
             imuState: sensorManager.imuState,
-            activeARWorldMapID: mappingManager.activeMapID
+            activeARWorldMapID: mappingManager.activeMapID,
+            speakLandmarks: speakLandmarks
         )
     }
 
@@ -773,6 +769,14 @@ struct ARMappingView: View {
 
     private func speakSemanticCue(_ cue: SemanticSpeechCue?) {
         guard let cue else { return }
+        if lastSpokenSemanticCueText == cue.text,
+           let lastSpokenSemanticCueAt,
+           Date().timeIntervalSince(lastSpokenSemanticCueAt) < 2.5 {
+            return
+        }
+        lastSpokenSemanticCueText = cue.text
+        lastSpokenSemanticCueAt = Date()
+
         switch cue.priority {
         case .regular:
             ttsManager.speak(cue.text)

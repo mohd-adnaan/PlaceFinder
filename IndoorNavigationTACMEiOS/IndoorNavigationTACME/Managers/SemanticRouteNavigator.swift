@@ -380,6 +380,46 @@ final class SemanticRouteNavigator: ObservableObject {
         rebuildRAGContext()
     }
 
+    func deleteMap(id: String) {
+        let wasActive = activeMap?.id == id || activeMapDraft?.id == id
+        stopNavigation(resetInstruction: false)
+        maps.removeAll { $0.id == id }
+        store.save(maps)
+
+        if wasActive {
+            activeMapDraft = nil
+            activeMap = maps.first
+        } else if let activeMap, maps.contains(where: { $0.id == activeMap.id }) == false {
+            self.activeMap = maps.first
+        }
+
+        targetName = ""
+        routeSteps.removeAll()
+        currentStepIndex = 0
+        segmentProgressMeters = 0
+        segmentRemainingMeters = 0
+        totalRemainingMeters = 0
+        recoveryReason = nil
+        phase = activeMap == nil ? .idle : .ready
+
+        if let activeMap {
+            refreshCaptureMetrics(for: activeMap)
+            currentInstruction = "Route deleted. Semantic map ready."
+        } else {
+            capturedPointCount = 0
+            capturedTurnCount = 0
+            capturedLandmarkCount = 0
+            capturedDestinationCount = 0
+            capturedDistanceMeters = 0
+            currentSegmentDraftMeters = 0
+            mappingQualityText = "Not mapping"
+            currentInstruction = "Route deleted. No saved semantic routes."
+        }
+
+        speechCue = SemanticSpeechCue(text: currentInstruction, priority: .regular)
+        rebuildRAGContext()
+    }
+
     func linkActiveRouteToARWorldMap(id arWorldMapId: String?) {
         guard let arWorldMapId,
               var map = activeMap,
@@ -1389,12 +1429,17 @@ final class SemanticRouteNavigator: ObservableObject {
         reversed: Bool
     ) -> Double? {
         if landmark.edgeID == baseEdgeID, let offset = landmark.offsetMeters {
+            if landmark.kind != .destinationContext,
+               landmark.nodeID == step.to.id,
+               offset >= step.edge.distanceMeters - 1.2 {
+                return nil
+            }
             return reversed ? step.edge.distanceMeters - offset : offset
         }
         if landmark.nodeID == step.from.id {
             return min(0.8, step.edge.distanceMeters)
         }
-        if landmark.nodeID == step.to.id {
+        if landmark.kind == .destinationContext, landmark.nodeID == step.to.id {
             return max(0, step.edge.distanceMeters - 0.8)
         }
         return nil

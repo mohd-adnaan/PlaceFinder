@@ -15,6 +15,7 @@ struct SemanticNavigationPanel: View {
     let selectARMap: (String?) -> Void
     let startARMapping: () -> Void
     let loadARMap: () -> Void
+    let deleteARMap: () -> Void
     let saveARMap: () -> Void
     let stopARSession: () -> Void
     let beginWalkthrough: (String) -> Void
@@ -36,6 +37,8 @@ struct SemanticNavigationPanel: View {
     @State private var showsLandmarkForm = false
     @State private var showsReview = false
     @State private var speakLandmarks = true
+    @State private var routeIDPendingDeletion: String?
+    @State private var showsDeleteRouteConfirm = false
 
     var body: some View {
         VStack(spacing: 14) {
@@ -77,6 +80,20 @@ struct SemanticNavigationPanel: View {
             if phase == .navigating || phase == .recovering || phase == .arrived {
                 mode = .guide
             }
+        }
+        .alert("Delete route?", isPresented: $showsDeleteRouteConfirm) {
+            Button("Cancel", role: .cancel) {
+                routeIDPendingDeletion = nil
+            }
+            Button("Delete", role: .destructive) {
+                if let routeIDPendingDeletion {
+                    navigator.deleteMap(id: routeIDPendingDeletion)
+                    syncTargetName()
+                }
+                routeIDPendingDeletion = nil
+            }
+        } message: {
+            Text("This removes the saved semantic route, turns, landmarks, and guidance graph. The AR map file is not deleted.")
         }
     }
 
@@ -122,14 +139,27 @@ struct SemanticNavigationPanel: View {
                         }
                         .pickerStyle(.menu)
 
-                        Button {
-                            loadARMap()
-                        } label: {
-                            Label("Load AR Map", systemImage: "location.viewfinder")
-                                .frame(maxWidth: .infinity)
+                        HStack(spacing: 10) {
+                            Button {
+                                loadARMap()
+                            } label: {
+                                Label("Load AR Map", systemImage: "location.viewfinder")
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+
+                            Button(role: .destructive) {
+                                deleteARMap()
+                            } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.large)
+                            .disabled(selectedARMapID == nil && savedARMaps.isEmpty)
+                            .accessibilityLabel("Delete selected AR map")
                         }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
                     }
                     .padding(.top, 8)
                 }
@@ -313,6 +343,7 @@ struct SemanticNavigationPanel: View {
                 unavailableGuideState
             } else {
                 routeSelectionMenu
+                deleteSelectedRouteButton
                 destinationSelectionMenu
 
                 Toggle(isOn: $speakLandmarks) {
@@ -376,6 +407,19 @@ struct SemanticNavigationPanel: View {
             let value = navigator.activeMap.map { routeLabel(for: $0) } ?? "Choose route"
             menuRow(title: "Route", value: value, systemImage: "map")
         }
+    }
+
+    private var deleteSelectedRouteButton: some View {
+        Button(role: .destructive) {
+            routeIDPendingDeletion = navigator.activeMap?.id
+            showsDeleteRouteConfirm = true
+        } label: {
+            Label("Delete Selected Route", systemImage: "trash")
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .controlSize(.large)
+        .disabled(navigator.activeMap == nil || navigator.phase == .mapping || navigator.phase == .navigating || navigator.phase == .recovering)
     }
 
     private var destinationSelectionMenu: some View {

@@ -324,6 +324,9 @@ struct ARMappingView: View {
             },
             startARMapping: startNewMap,
             loadARMap: loadSelectedMap,
+            deleteARMap: {
+                showDeleteMapConfirm = true
+            },
             saveARMap: { mappingManager.saveMap(named: mapName) },
             stopARSession: { mappingManager.stopMapping() },
             beginWalkthrough: beginSemanticWalkthrough,

@@ -675,7 +675,11 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
     private struct ARIMUMotionReference {
         let poiName: String
-        let poiPosition: simd_float3
+        // Camera position (AR frame) when the reference was locked. The user's
+        // displacement is measured from here — comparing against POI-to-POI
+        // distances (as before) falsely flagged "IMU disagrees" whenever a POI
+        // was first seen from far away, jamming recognition of the next POI.
+        let cameraPosition: simd_float3
         let imuPosition: SIMD2<Double>
         let stepCount: Int
         let updatedAt: Date
@@ -876,9 +880,8 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         )
     }
 
-    private func recordMotionReferenceIfNeeded(for match: POIMatch, records: [POIRecord]) {
+    private func recordMotionReferenceIfNeeded(for match: POIMatch, cameraPosition: simd_float3) {
         guard let motion = currentIMUMotion() else { return }
-        let poiPosition = position(for: match, in: records)
 
         imuMotionQueue.async(flags: .barrier) {
             if self.motionReference?.poiName == match.name {
@@ -887,7 +890,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
 
             self.motionReference = ARIMUMotionReference(
                 poiName: match.name,
-                poiPosition: poiPosition,
+                cameraPosition: cameraPosition,
                 imuPosition: motion.position,
                 stepCount: motion.stepCount,
                 updatedAt: motion.updatedAt
@@ -895,14 +898,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         }
     }
 
-    private func finalizedStableResult(_ result: POIMatchResult, records: [POIRecord]) -> POIMatchResult {
+    private func finalizedStableResult(_ result: POIMatchResult, cameraPosition: simd_float3) -> POIMatchResult {
         if let match = result.match {
-            recordMotionReferenceIfNeeded(for: match, records: records)
+            recordMotionReferenceIfNeeded(for: match, cameraPosition: cameraPosition)
         }
         return result
     }
 
-    private func motionCheckedResult(from result: POIMatchResult, records: [POIRecord]) -> POIMatchResult {
+    private func motionCheckedResult(from result: POIMatchResult, cameraPosition: simd_float3) -> POIMatchResult {
         guard let match = result.match,
               let motion = currentIMUMotion(),
               let reference = currentMotionReference() else {
@@ -916,14 +919,16 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         let imuDistance = Float(simd_length(imuDelta))
         guard imuDistance >= imuMotionMinimumDistance else { return result }
 
-        let candidatePosition = position(for: match, in: records)
+        // Camera displacement since the reference, converted to the IMU map
+        // frame: ARKit +X is east and +Z is south, the IMU map uses +X east /
+        // +Y north, so Z must be negated before comparing directions.
         let arDelta = SIMD2<Double>(
-            Double(candidatePosition.x - reference.poiPosition.x),
-            Double(candidatePosition.z - reference.poiPosition.z)
+            Double(cameraPosition.x - reference.cameraPosition.x),
+            -Double(cameraPosition.z - reference.cameraPosition.z)
         )
-        let candidateDistance = Float(simd_length(arDelta))
+        let arDistance = Float(simd_length(arDelta))
         let tolerance = imuMotionTolerance(forDistance: imuDistance)
-        let mismatch = abs(candidateDistance - imuDistance)
+        let mismatch = abs(arDistance - imuDistance)
         let directionMismatch = motionDirectionMismatchDegrees(imuDelta: imuDelta, arDelta: arDelta)
         let directionDisagrees = directionMismatch.map { $0 > imuMotionDirectionToleranceDegrees } ?? false
 
@@ -991,18 +996,23 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             return POIMatchResult(match: nil, isAmbiguous: false)
         }
 
+        let cameraPosition = simd_make_float3(
+            cameraTransform.columns.3.x,
+            cameraTransform.columns.3.y,
+            cameraTransform.columns.3.z
+        )
         let spatialResult = bestSpatialPOIMatch(cameraTransform: cameraTransform, records: records)
         let hasVisualSamples = records.contains { !$0.visualFingerprints.isEmpty }
 
         guard hasVisualSamples else {
-            let motionResult = motionCheckedResult(from: spatialResult, records: records)
+            let motionResult = motionCheckedResult(from: spatialResult, cameraPosition: cameraPosition)
             let stable = stableResult(
                 from: motionResult,
                 timestamp: timestamp,
                 acceptedPrefix: "Stable AR-only",
                 waitingPrefix: "Confirming AR-only"
             )
-            return finalizedStableResult(stable, records: records)
+            return finalizedStableResult(stable, cameraPosition: cameraPosition)
         }
 
         guard let visualResult = bestVisualPOIMatch(
@@ -1024,7 +1034,7 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                 acceptedPrefix: "Stable AR+visual",
                 waitingPrefix: "Confirming AR+visual"
             )
-            return finalizedStableResult(stable, records: records)
+            return finalizedStableResult(stable, cameraPosition: cameraPosition)
         }
 
         let fusedResult = fuse(
@@ -1033,14 +1043,14 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
             cameraTransform: cameraTransform,
             records: records
         )
-        let motionResult = motionCheckedResult(from: fusedResult, records: records)
+        let motionResult = motionCheckedResult(from: fusedResult, cameraPosition: cameraPosition)
         let stable = stableResult(
             from: motionResult,
             timestamp: timestamp,
             acceptedPrefix: "Stable AR+visual",
             waitingPrefix: "Confirming AR+visual"
         )
-        return finalizedStableResult(stable, records: records)
+        return finalizedStableResult(stable, cameraPosition: cameraPosition)
     }
 
     private func bestSpatialPOIMatch(cameraTransform: simd_float4x4, records: [POIRecord]) -> POIMatchResult {
@@ -1192,6 +1202,20 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
         }
 
         guard let visualMatch = visualResult.match else {
+            // A POI pinned without visual samples can never win a visual vote,
+            // so requiring one here made it permanently unrecognizable once any
+            // other POI had samples (issue #4: recognition jams on the last
+            // POI). Fall back to spatial-only matching for unsampled POIs; the
+            // stability gate still applies downstream.
+            if let spatialMatch = spatialResult.match,
+               !spatialResult.isAmbiguous,
+               records.first(where: { $0.name == spatialMatch.name })?.visualFingerprints.isEmpty ?? true {
+                return POIMatchResult(
+                    match: spatialMatch,
+                    isAmbiguous: false,
+                    statusText: String(format: "AR-only (unsampled) %.0f%%", spatialMatch.confidence * 100)
+                )
+            }
             resetStableMatch()
             let visualStatus = visualResult.statusText ?? "Visual weak"
             let statusText: String
@@ -1246,6 +1270,34 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
                     match: visualOverrideMatch,
                     isAmbiguous: false,
                     statusText: String(format: "Visual chose %@ %.0f%%", visualOverrideMatch.name, visualOverrideMatch.confidence * 100)
+                )
+            }
+
+            // If the spatially matched POI has no visual samples, the visual
+            // channel can only ever vote for *other* POIs — a lookalike view
+            // elsewhere shouldn't permanently veto a confident pose match.
+            // Keep the match with a confidence haircut; the 0.82 stability
+            // floor still rejects it unless the pose evidence is very strong.
+            if records.first(where: { $0.name == spatialMatch.name })?.visualFingerprints.isEmpty ?? true,
+               visualMatch.confidence < visualOverrideConfidence {
+                let adjustedConfidence = spatialMatch.confidence * 0.88
+                let adjustedMatch = POIMatch(
+                    name: spatialMatch.name,
+                    distance: spatialMatch.distance,
+                    angleDegrees: spatialMatch.angleDegrees,
+                    confidence: adjustedConfidence,
+                    score: 1 - adjustedConfidence,
+                    visualConfidence: nil
+                )
+                return POIMatchResult(
+                    match: adjustedMatch,
+                    isAmbiguous: false,
+                    statusText: String(
+                        format: "AR %@ (unsampled) %.0f%%, visual saw %@",
+                        spatialMatch.name,
+                        adjustedConfidence * 100,
+                        visualMatch.name
+                    )
                 )
             }
 
@@ -1366,7 +1418,11 @@ final class ARMappingManager: NSObject, ObservableObject, ARSessionDelegate, @un
     private func headingDegrees(for cameraForward: simd_float3) -> Double? {
         let horizontal = SIMD2<Double>(Double(cameraForward.x), Double(cameraForward.z))
         guard simd_length(horizontal) > 0.001 else { return nil }
-        return normalizedDegrees(atan2(horizontal.x, horizontal.y) * 180 / Double.pi)
+        // With .gravityAndHeading, ARKit's -Z axis points true north and +X east.
+        // Heading 0° = north therefore requires atan2(x, -z); using atan2(x, z)
+        // mirrors north and south (a camera facing north reported 180°), which
+        // corrupted the initial bearing handed to the IMU.
+        return normalizedDegrees(atan2(horizontal.x, -horizontal.y) * 180 / Double.pi)
     }
 
     private func normalizedDegrees(_ degrees: Double) -> Double {

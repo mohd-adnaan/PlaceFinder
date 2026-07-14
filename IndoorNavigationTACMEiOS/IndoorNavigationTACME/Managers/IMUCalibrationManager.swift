@@ -158,8 +158,12 @@ class IMUCalibrationManager: ObservableObject {
         }
         
         let adjustedConfidence = newConfidence * timeDecayFactor
-        
-        calibrationState.calibrationConfidence = adjustedConfidence
+
+        // Called from the sensor queue on every confirmed step — the @Published
+        // write must happen on the main thread like every other state update here.
+        DispatchQueue.main.async { [weak self] in
+            self?.calibrationState.calibrationConfidence = adjustedConfidence
+        }
         lastKnownImuPosition = currentImuPosition
     }
     

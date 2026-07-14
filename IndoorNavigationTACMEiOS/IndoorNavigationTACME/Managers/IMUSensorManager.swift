@@ -147,6 +147,10 @@ class IMUSensorManager: ObservableObject {
             print("IMUSensorManager: Device motion not available")
             return
         }
+
+        guard !motionManager.isDeviceMotionActive else {
+            return
+        }
         
         motionManager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: OperationQueue()) { [weak self] motion, error in
             guard let self = self, let motion = motion else {
@@ -233,6 +237,7 @@ class IMUSensorManager: ObservableObject {
             gyroIntegrationBearing = bearing
             currentBearing = bearing
             initialBearingSet = true
+            updateIMUState()
         }
         print("IMUSensorManager: Initial bearing set to \(bearing)°")
     }
@@ -263,29 +268,47 @@ class IMUSensorManager: ObservableObject {
     }
     
     func startStepCalibration() {
-        stepFactorCalibration.startCalibration()
+        // Calibration counts steps, so the motion pipeline must be running.
+        // Previously a user could start calibrating from a screen that never
+        // called startSensors() and walk 20 m with the counter stuck at 0.
+        startSensors()
+        sensorQueue.sync {
+            stepFactorCalibration.startCalibration()
+        }
         imuState.isCalibrating = true
+        imuState.calibrationStepCount = 0
     }
-    
+
     func completeStepCalibration() {
-        stepFactorCalibration.completeCalibration()
+        sensorQueue.sync {
+            stepFactorCalibration.completeCalibration()
+        }
         imuState.beta = stepFactorCalibration.getUserBeta()
         imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
         imuState.isCalibrating = false
     }
-    
+
+    /// Cancel an in-progress calibration walk, discarding its data.
+    /// This must NOT persist a beta: extrapolating from a partial walk with the
+    /// assumed 0.65 m stride (what stopCalibration() did) silently overwrote a
+    /// good calibration with a garbage one every time the user tapped Cancel.
     func stopStepCalibration() {
-        let _ = stepFactorCalibration.stopCalibration()
+        sensorQueue.sync {
+            stepFactorCalibration.cancel()
+        }
         imuState.beta = stepFactorCalibration.getUserBeta()
         imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
         imuState.isCalibrating = false
+        imuState.calibrationStepCount = 0
     }
 
     /// Wipe the persisted step-factor calibration. Call before handing the device
     /// to a new user so they can recalibrate for their own gait. Resets `imuState`
     /// to reflect the cleared values immediately.
     func clearStepCalibration() {
-        stepFactorCalibration.clearPersisted()
+        sensorQueue.sync {
+            stepFactorCalibration.clearPersisted()
+        }
         imuState.beta = stepFactorCalibration.getUserBeta()
         imuState.isStepCalibrationValid = stepFactorCalibration.isCalibrationValid()
         imuState.isCalibrating = false
@@ -606,6 +629,14 @@ class IMUSensorManager: ObservableObject {
         
         if stepFactorCalibration.isCalibrating {
             stepFactorCalibration.addStepData(peakValleyDifference: peakValleyDiff)
+            // Auto-complete the 20 m calibration walk here in the sensor layer.
+            // The UI promises auto-completion, but the previous implementation
+            // lived in NavigationSettingsView.onChange and silently stopped
+            // working the moment that screen was dismissed mid-walk.
+            if stepFactorCalibration.shouldAutoComplete() {
+                stepFactorCalibration.completeCalibration()
+                print("IMUSensorManager: Step calibration auto-completed after \(stepCount) steps, beta=\(String(format: "%.3f", stepFactorCalibration.getUserBeta()))")
+            }
         }
         
         detectedPeaks.append(lastPeak)
@@ -773,6 +804,10 @@ class UserStepFactorCalibration {
     private var calibratedAvgPvDiff: Double = 0.0
     
     private let calibrationDistance: Double = 20.0
+    // Nominal stride used only for walk-progress estimation; must stay in sync
+    // with StepCalibrationCard.averageStepLength so the UI progress bar and the
+    // auto-complete trigger agree.
+    private let assumedProgressStepLength: Double = 0.65
     // FIX: Default beta raised from 0.6 to 0.8 for iOS signal scale.
     // See IMUSensorManager.defaultBeta comment for full explanation.
     private let defaultBeta: Double = 0.8
@@ -822,25 +857,13 @@ class UserStepFactorCalibration {
         isCalibrating = false
     }
     
-    func stopCalibration() -> Bool {
-        guard isCalibrating else { return false }
-        if accumulatedAccelerationDiff > 0 && userStepCount > 0 {
-            let estimatedDistance = Double(userStepCount) * 0.65
-            userBeta = estimatedDistance / accumulatedAccelerationDiff
-            isValid = userBeta > 0.1 && userBeta < 2.0
-            if isValid {
-                calibratedBeta = userBeta
-                if !calibrationPvDiffs.isEmpty {
-                    calibratedAvgPvDiff = calibrationPvDiffs.reduce(0, +) /
-                        Double(calibrationPvDiffs.count)
-                }
-                persistCalibration()
-            }
-        }
-        isCalibrating = false
-        return isValid
+    /// True once the calibration walk has covered the target distance
+    /// (estimated with the nominal 0.65 m stride, matching the progress the
+    /// calibration card shows the user).
+    func shouldAutoComplete() -> Bool {
+        isCalibrating && Double(userStepCount) * assumedProgressStepLength >= calibrationDistance
     }
-    
+
     func cancel() {
         isCalibrating = false
         userStepCount = 0

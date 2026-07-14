@@ -28,6 +28,7 @@ struct NavigationScreen: View {
     @State private var useClockDirections: Bool = UserDefaults.standard.bool(forKey: "useClockDirections")
     @State private var useLandmarks: Bool = UserDefaults.standard.bool(forKey: "useLandmarks")
     @AppStorage("voiceControlledMode") private var voiceControlledMode: Bool = false
+    @AppStorage("debugOverlayEnabled") private var debugOverlayEnabled: Bool = false
 
     var body: some View {
         ZStack {
@@ -42,8 +43,9 @@ struct NavigationScreen: View {
                 navigationOverlay
             }
             
-            // Debug overlay — floating bug button + log panel
-            DebugOverlayView()
+            if debugOverlayEnabled {
+                DebugOverlayView()
+            }
         }
         .sheet(isPresented: $showSettings) {
             // FIX: Use NavigationSettingsView (renamed to avoid conflict)

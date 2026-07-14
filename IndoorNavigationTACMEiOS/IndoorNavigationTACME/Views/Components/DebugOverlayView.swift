@@ -4,7 +4,7 @@
 //
 //  Created by Mohammad Adnaan on 2026-03-15.
 //
-//  Floating bug button (bottom-right) that toggles an overlay showing
+//  Floating debug tools button (bottom-right) that toggles an overlay showing
 //  live debug logs: API calls/responses, navigation events, errors, etc.
 //  Also provides export buttons for research data.
 //
@@ -34,8 +34,7 @@ struct DebugOverlayView: View {
                     ))
             }
             
-            // Bug button
-            bugButton
+            debugButton
         }
         // Manual share sheet removed: research data uploads directly to Google
         // Sheets via DataExportManager.upload* / LogWebAppService, so the
@@ -46,9 +45,9 @@ struct DebugOverlayView: View {
         }
     }
     
-    // MARK: - Bug Button
+    // MARK: - Debug Button
     
-    private var bugButton: some View {
+    private var debugButton: some View {
         Button(action: {
             withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) {
                 isExpanded.toggle()
@@ -58,18 +57,18 @@ struct DebugOverlayView: View {
                 Circle()
                     .fill(isExpanded
                           ? Color.red.opacity(0.9)
-                          : Color.white.opacity(0.12))
-                    .frame(width: 48, height: 48)
+                          : Color.black.opacity(0.58))
+                    .frame(width: 44, height: 44)
                     .shadow(color: .black.opacity(0.3), radius: 4, y: 2)
                 
-                Image(systemName: isExpanded ? "xmark" : "ladybug.fill")
-                    .font(.system(size: 20))
-                    .foregroundColor(isExpanded ? .white : .orange)
+                Image(systemName: isExpanded ? "xmark" : "terminal.fill")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundColor(.white)
             }
         }
         .padding(.trailing, 16)
         .padding(.bottom, 16)
-        .accessibilityLabel(isExpanded ? "Close debug log" : "Open debug log")
+        .accessibilityLabel(isExpanded ? "Close debug tools" : "Open debug tools")
     }
     
     // MARK: - Log Panel
@@ -91,7 +90,7 @@ struct DebugOverlayView: View {
         .background(Color.black.opacity(0.92))
         .cornerRadius(16)
         .padding(.horizontal, 8)
-        .padding(.bottom, 72) // Above the bug button
+        .padding(.bottom, 68) // Above the debug button
         .frame(maxHeight: UIScreen.main.bounds.height * 0.55)
     }
     
@@ -99,7 +98,7 @@ struct DebugOverlayView: View {
     
     private var headerBar: some View {
         HStack {
-            Image(systemName: "ant.fill")
+            Image(systemName: "terminal.fill")
                 .foregroundColor(.orange)
             Text("Debug Log")
                 .font(.system(size: 14, weight: .bold, design: .monospaced))

@@ -18,7 +18,6 @@ struct NavigationSettingsView: View {
     @EnvironmentObject var qrDetector: QRCodeDetector
     @EnvironmentObject var conversationManager: ConversationManager
     @EnvironmentObject var languageManager: LanguageManager
-    @EnvironmentObject var arMappingManager: ARMappingManager
 
     @Environment(\.dismiss) var dismiss
 
@@ -28,10 +27,11 @@ struct NavigationSettingsView: View {
     @Binding var useClockDirections: Bool
     @Binding var useLandmarks: Bool
     @Binding var voiceControlledMode: Bool
-    @State private var didAutoSubmitCurrentCalibration: Bool = false
+    @AppStorage("debugOverlayEnabled") private var debugOverlayEnabled: Bool = false
+    // Set by the manual Complete/Cancel handlers, which speak their own
+    // feedback; suppresses the auto-completion announcement in onChange.
+    @State private var suppressCompletionAnnouncement: Bool = false
     @State private var showClearCalibrationConfirm: Bool = false
-
-    private let autoCalibrationDistanceMeters: Double = 20.0
 
     var body: some View {
         NavigationView {
@@ -55,7 +55,7 @@ struct NavigationSettingsView: View {
                     StepCalibrationCard(
                         imuState: sensorManager.imuState,
                         onStartCalibration: {
-                            didAutoSubmitCurrentCalibration = false
+                            suppressCompletionAnnouncement = false
                             sensorManager.startStepCalibration()
                             // Announce calibration start so the user knows to start walking
                             let msg = languageManager.currentLanguage == .french
@@ -64,27 +64,19 @@ struct NavigationSettingsView: View {
                             ttsManager.speak(msg, force: true)
                         },
                         onCompleteCalibration: {
-                            didAutoSubmitCurrentCalibration = false
+                            suppressCompletionAnnouncement = true
                             sensorManager.completeStepCalibration()
-                            // Announce result so visually impaired users get feedback
-                            let beta = sensorManager.imuState.beta
-                            let isValid = sensorManager.imuState.isStepCalibrationValid
-                            let isFrench = languageManager.currentLanguage == .french
-                            if isValid {
-                                let msg = isFrench
-                                    ? "Calibration terminée. Facteur bêta: \(String(format: "%.3f", beta))"
-                                    : "Step calibration complete. Beta factor: \(String(format: "%.3f", beta))"
-                                ttsManager.speakPriority(msg)
-                            } else {
-                                let msg = isFrench
-                                    ? "Données insuffisantes. Réessayez."
-                                    : "Not enough data collected. Please try again."
-                                ttsManager.speakPriority(msg)
-                            }
+                            announceCalibrationResult()
                         },
                         onStopCalibration: {
-                            didAutoSubmitCurrentCalibration = false
+                            suppressCompletionAnnouncement = true
                             sensorManager.stopStepCalibration()
+                            // Cancel discards the walk — say so, otherwise a blind
+                            // user has no way to tell the tap registered.
+                            let msg = languageManager.currentLanguage == .french
+                                ? "Calibration annulée."
+                                : "Calibration cancelled."
+                            ttsManager.speakPriority(msg)
                         }
                     )
 
@@ -178,42 +170,16 @@ struct NavigationSettingsView: View {
                 }
             }
             .onChange(of: sensorManager.imuState.isCalibrating) { isCalibrating in
-                if !isCalibrating {
-                    didAutoSubmitCurrentCalibration = false
+                // The 20 m auto-complete now lives in IMUSensorManager (it keeps
+                // working if this screen is dismissed mid-walk). When it fires,
+                // isCalibrating flips false and we announce the result here.
+                // Manual Complete/Cancel speak their own feedback and suppress this.
+                if isCalibrating { return }
+                if suppressCompletionAnnouncement {
+                    suppressCompletionAnnouncement = false
+                    return
                 }
-            }
-            .onChange(of: sensorManager.imuState.calibrationStepCount) { stepCount in
-                guard sensorManager.imuState.isCalibrating else { return }
-                guard !didAutoSubmitCurrentCalibration else { return }
-
-                let estimatedDistance = Double(stepCount) * 0.65
-                guard estimatedDistance >= autoCalibrationDistanceMeters else { return }
-
-                didAutoSubmitCurrentCalibration = true
-                sensorManager.completeStepCalibration()
-
-                // ═══════════════════════════════════════════════════════════
-                // ACCESSIBILITY FIX: Announce calibration completion via TTS.
-                //
-                // Root cause: Auto-calibration triggers silently. Sighted
-                // users see the UI update; visually impaired users get zero
-                // feedback. This spoken confirmation closes the gap.
-                // ═══════════════════════════════════════════════════════════
-                let beta = sensorManager.imuState.beta
-                let isValid = sensorManager.imuState.isStepCalibrationValid
-                let isFrench = languageManager.currentLanguage == .french
-
-                if isValid {
-                    let message = isFrench
-                        ? "Calibration terminée. Facteur bêta: \(String(format: "%.3f", beta))"
-                        : "Step calibration complete. Beta factor: \(String(format: "%.3f", beta))"
-                    ttsManager.speakPriority(message)
-                } else {
-                    let message = isFrench
-                        ? "Calibration terminée, mais les données sont insuffisantes."
-                        : "Calibration finished, but not enough data was collected."
-                    ttsManager.speakPriority(message)
-                }
+                announceCalibrationResult()
             }
             .alert(
                 languageManager.currentLanguage == .french
@@ -312,6 +278,35 @@ struct NavigationSettingsView: View {
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
 
+            // Debug tools toggle
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Label("Debug Mode", systemImage: "terminal.fill")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.orange)
+
+                    Text("Show a small logs button on the home screen")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                Spacer()
+
+                Toggle("", isOn: $debugOverlayEnabled)
+                    .labelsHidden()
+                    .toggleStyle(SwitchToggleStyle(tint: .orange))
+                    .onChange(of: debugOverlayEnabled) { newValue in
+                        let message = newValue
+                            ? "Debug mode enabled"
+                            : "Debug mode disabled"
+                        ttsManager.speak(message, force: true)
+                    }
+            }
+            .padding()
+            .background(Color(.secondarySystemBackground))
+            .cornerRadius(12)
+
             // VoiceOver compatibility toggle
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
@@ -343,9 +338,9 @@ struct NavigationSettingsView: View {
             .padding()
             .background(Color(.secondarySystemBackground))
             .cornerRadius(12)
-            
+
             // AR Localization & Mapping Button
-            NavigationLink(destination: ARMappingView()) {
+            NavigationLink(destination: ARMappingView(sourceSelection: $source)) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Label("AR Localization & Mapping", systemImage: "arkit")
@@ -402,9 +397,32 @@ struct NavigationSettingsView: View {
 
     /// Wipe the persisted gait calibration and announce the result.
     /// Triggered from the destructive option in the clear-calibration alert.
+    /// Speak the outcome of a finished calibration so visually impaired users
+    /// get feedback whether it completed automatically or via the button.
+    private func announceCalibrationResult() {
+        let beta = sensorManager.imuState.beta
+        let isValid = sensorManager.imuState.isStepCalibrationValid
+        let isFrench = languageManager.currentLanguage == .french
+
+        if isValid {
+            let message = isFrench
+                ? "Calibration terminée. Facteur bêta: \(String(format: "%.3f", beta))"
+                : "Step calibration complete. Beta factor: \(String(format: "%.3f", beta))"
+            ttsManager.speakPriority(message)
+        } else {
+            let message = isFrench
+                ? "Données insuffisantes. Réessayez."
+                : "Not enough data collected. Please try again."
+            ttsManager.speakPriority(message)
+        }
+    }
+
     private func performClearCalibration() {
+        // Clearing also aborts any in-progress walk; the "calibration cleared"
+        // message below is the only announcement that should play.
+        // (onStartCalibration resets this flag for the next walk.)
+        suppressCompletionAnnouncement = true
         sensorManager.clearStepCalibration()
-        didAutoSubmitCurrentCalibration = false
 
         let isFrench = languageManager.currentLanguage == .french
         let message = isFrench
